@@ -1,7 +1,5 @@
 # Kong Upstream JWT Plugin
 
-## NGCC Customization
-
 > !!! Important: Read this before proceeding
 
 This plugin was forked from `master` branch of [Optum/kong-upstream-jwt](https://github.com/Optum/kong-upstream-jwt).
