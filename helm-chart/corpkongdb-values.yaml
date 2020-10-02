@@ -246,19 +246,19 @@ proxy:
 # Subdirectories (which are optional) require separate ConfigMaps/Secrets.
 # "path" indicates their directory under the main plugin directory: the example
 # below will mount the contents of kong-plugin-rewriter-migrations at "/opt/kong/rewriter/migrations".
-# plugins:
-#   configMaps:
-#   - name: kong-plugin-upstream-jwt
-#     pluginName: upstream-jwt
-#   - name: kong-plugin-custom-response-transformer
-#     pluginName: custom-response-transformer
-#   - name: kong-plugin-custom-oauth2
-#     pluginName: custom-oauth2
-#     subdirectories:
-#     - name: kong-plugin-custom-oauth2-migrations
-#       path: migrations
-#     - name: kong-plugin-custom-oauth2-daos
-#       path: daos
+plugins:
+  configMaps:
+  - name: kong-plugin-upstream-jwt
+    pluginName: upstream-jwt
+  - name: kong-plugin-custom-response-transformer
+    pluginName: custom-response-transformer
+  - name: kong-plugin-custom-oauth2
+    pluginName: custom-oauth2
+    subdirectories:
+    - name: kong-plugin-custom-oauth2-migrations
+      path: migrations
+    - name: kong-plugin-custom-oauth2-daos
+      path: daos
   # secrets:
   # - pluginName: rewriter
   #   name: kong-plugin-rewriter
@@ -337,7 +337,7 @@ ingressController:
     failurePolicy: Fail
     port: 8080
 
-  ingressClass: kong
+  ingressClass: corp-kong
 
   rbac:
     # Specifies whether RBAC resources should be created

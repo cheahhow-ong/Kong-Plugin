@@ -1,0 +1,16 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: test1
+  annotations:
+    konghq.com/plugins: basic-auth
+    konghq.com/strip-path: "true"
+    kubernetes.io/ingress.class: "corp-kong"
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          serviceName: httpbin
+          servicePort: 80
+        path: /httpbin
