@@ -1,6 +1,5 @@
 local body_transformer = require "kong.plugins.custom-response-transformer.body_transformer"
 local header_transformer = require "kong.plugins.custom-response-transformer.header_transformer"
-local access = require "kong.plugins.custom-response-transformer.access"
 
 local is_json_body = header_transformer.is_json_body
 local concat = table.concat
@@ -13,7 +12,6 @@ local ResponseTransformerHandler = {}
 function ResponseTransformerHandler:access()
   kong.service.request.enable_buffering()
   kong.ctx.plugin.headers = kong.request.get_headers()
-  access.execute()
 end
 
 function ResponseTransformerHandler:header_filter(conf)
@@ -55,11 +53,11 @@ function ResponseTransformerHandler:body_filter()
   -- it does not need to go through the body_transformer function, all neccessary information is saved in the db, 
   -- by selecting refresh token from db, it can retrieve all info as seen in custom-oauth2 access.lua line 551,
   -- then, all that's left for kong to do is insert those necessary info and send back to FE, as seen in custom-oauth2 access.lua line 579
-  -- if is_json_body(kong.response.get_header("Content-Type"))
-  --   and kong.response.get_status() == 200
-  --   and not ((first_time_path or biometric_path or password_path or pin_path) and grant_type == "refresh_token" and refresh_token) then
+  if is_json_body(kong.response.get_header("Content-Type"))
+    and kong.response.get_status() == 200
+    and not ((first_time_path or biometric_path or password_path or pin_path) and grant_type == "refresh_token" and refresh_token) then
   
-  if kong.response.get_status() == 200 then
+  -- if kong.response.get_status() == 200 then
 
     local ctx = ngx.ctx
     local chunk, eof = ngx.arg[1], ngx.arg[2]
