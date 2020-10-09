@@ -140,7 +140,7 @@ postgresqlPassword: SuperAdmin#123! # <----
 ## Create a database
 ## ref: https://github.com/bitnami/bitnami-docker-postgresql/blob/master/README.md#creating-a-database-on-first-run
 ##
-postgresqlDatabase: corp-kong # <---- 
+postgresqlDatabase: default # <---- 
 
 ## PostgreSQL data dir
 ## ref: https://github.com/bitnami/bitnami-docker-postgresql/blob/master/README.md
