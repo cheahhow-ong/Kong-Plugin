@@ -1,6 +1,6 @@
 local body_transformer = require "kong.plugins.custom-response-transformer.body_transformer"
 local header_transformer = require "kong.plugins.custom-response-transformer.header_transformer"
-
+local access = require "kong.plugins.custom-response-transformer.access"
 
 local is_json_body = header_transformer.is_json_body
 local concat = table.concat
@@ -13,6 +13,7 @@ local ResponseTransformerHandler = {}
 function ResponseTransformerHandler:access()
   kong.service.request.enable_buffering()
   kong.ctx.plugin.headers = kong.request.get_headers()
+  access.execute()
 end
 
 function ResponseTransformerHandler:header_filter(conf)
@@ -32,9 +33,11 @@ end
 function ResponseTransformerHandler:body_filter()
 
   local path = kong.request.get_path()
-  local prelogin_path = string.find(path, "/v1/authorization/prelogin", nil, true)
-  local login_path = string.find(path, "/v1/authorization/login", nil, true)
-  local biometric_path = string.find(path, "/v1/authorization/biometric", nil, true)
+  local first_time_path = string.find(path, "/v1/first-time/mobile/password/grant", nil, true)
+  local biometric_path = string.find(path, "/v1/biometric/grant", nil, true)
+  local password_path = string.find(path, "/v1/password/grant", nil, true)
+  local pin_path = string.find(path, "/v1/pin/grant", nil, true)
+  
   
   local grant_type = kong.request.get_query_arg("grant_type")
   local refresh_token = kong.request.get_query_arg("refresh_token")
@@ -48,13 +51,15 @@ function ResponseTransformerHandler:body_filter()
   -- end
 
   -- If BE returns an error it will immediately be displayed to the FE and this segment of code will not execute.
-  -- Reason refresh token flow is not allowed in this if block is because refresh token flow only generates new access token, 
+  -- Reason refresh token flow is NOT allowed in this if block is because refresh token flow only generates new access token, 
   -- it does not need to go through the body_transformer function, all neccessary information is saved in the db, 
   -- by selecting refresh token from db, it can retrieve all info as seen in custom-oauth2 access.lua line 551,
-  -- then, all that's left for kong to do is insert those necessary info and send back to FE, as seen in ustom-oauth2 access.lua line 579
-  if is_json_body(kong.response.get_header("Content-Type"))
-    and kong.response.get_status() == 200
-    and not ((prelogin_path or login_path or biometric_path) and grant_type == "refresh_token" and refresh_token) then
+  -- then, all that's left for kong to do is insert those necessary info and send back to FE, as seen in custom-oauth2 access.lua line 579
+  -- if is_json_body(kong.response.get_header("Content-Type"))
+  --   and kong.response.get_status() == 200
+  --   and not ((first_time_path or biometric_path or password_path or pin_path) and grant_type == "refresh_token" and refresh_token) then
+  
+  if kong.response.get_status() == 200 then
 
     local ctx = ngx.ctx
     local chunk, eof = ngx.arg[1], ngx.arg[2]
