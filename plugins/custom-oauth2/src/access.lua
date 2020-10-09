@@ -379,7 +379,8 @@ local function issue_token(conf)
     
     kong.log("parameters[PROVISION_KEY]: ", parameters[PROVISION_KEY])
     kong.log("conf.provision_key: ", conf.provision_key)
-    kong.log("conf", conf)
+    kong.log("conf:")
+    kong.log.inspect(conf)
 
 
     local state = parameters[STATE]
@@ -392,7 +393,7 @@ local function issue_token(conf)
             (conf.enable_password_grant and grant_type == GRANT_PASSWORD)) then
         response_params = {
             [ERROR] = "unsupported_grant_type",
-            error_description = "Invalid " .. GRANT_TYPE
+            error_description = "Invalid " .. GRANT_TYPE .. ", conf.enable_client_credentials: " .. tostring(conf.enable_client_credentials) .. ", grant_type: " .. grant_type
         }
     end
 
@@ -507,6 +508,7 @@ local function issue_token(conf)
                         client,
                         parameters.authenticated_userid,
                         scope, state, nil, false)
+                    kong.log("response_params", kong.log.inspect(response_params))
                 end
             end
 
@@ -596,6 +598,9 @@ local function issue_token(conf)
 
         -- Storing reponse_params inside kong.ctx.shared.token and returning it to FE
         kong.ctx.shared.token = kong.db.oauth2_tokens:select_by_access_token(response_params.access_token)
+        kong.log("Access token is SUCCESSFULLY generated")
+        kong.log("kong.ctx.shared.token: ")
+        kong.log.inspect(kong.ctx.shared.token)
     else
         kong.log("Access token is not successfully generated")
         return kong.response.exit(response_params[ERROR] and
@@ -909,10 +914,12 @@ function _M.execute(conf)
         local path = kong.request.get_path()
 
         -- if path matches that of Login's API, issue token
-        local from = string_find(path, "/v1/authorization/prelogin", nil, true)
-                        or string_find(path, "/v1/authorization/login", nil, true)
-                        or string_find(path, "/v1/authorization/biometric", nil, true)
+        local from = string_find(path, "/v1/first-time/mobile/password/grant", nil, true)
+                        or string_find(path, "/v1/pin/grant", nil, true)
+                        or string_find(path, "/v1/biometric/grant", nil, true)
+                        or string_find(path, "/v1/password/grant", nil, true)
         if from then
+            kong.log("path: ", from)
             return issue_token(conf)
         end
 
