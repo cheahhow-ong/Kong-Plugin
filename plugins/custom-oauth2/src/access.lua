@@ -231,6 +231,7 @@ local function authorize(conf)
         allowed_redirect_uris, client = get_redirect_uris(parameters[CLIENT_ID])
 
         if not allowed_redirect_uris then
+            kong.log("HIHI SUPER SUPER SUPER SUPER ERROR HERE")
             response_params = {
                 [ERROR] = "invalid_client",
                 error_description = "Invalid client authentication"
@@ -399,9 +400,11 @@ local function issue_token(conf)
 
     local client_id, client_secret, from_authorization_header =
     retrieve_client_credentials(parameters, conf)
-
+    kong.log("ERROR: ", client_id, client_secret,from_authorization_header )
     -- Check client_id and redirect_uri
     local allowed_redirect_uris, client = get_redirect_uris(client_id)
+    kong.log("ERROR HERE PLEASE: ", allowed_redirect_uris)
+    kong.log("ERROR 2ND HERE PLEASE: ", client)
     if not (grant_type == GRANT_CLIENT_CREDENTIALS) then
         if allowed_redirect_uris then
             local redirect_uri = parameters[REDIRECT_URI] and
@@ -418,6 +421,7 @@ local function issue_token(conf)
             end
 
         else
+            kong.log("HIHI CRAZY ERROR HERE")
             response_params = {
                 [ERROR] = "invalid_client",
                 error_description = "Invalid client authentication"
@@ -433,6 +437,7 @@ local function issue_token(conf)
     end
 
     if client and client.client_secret ~= client_secret then
+        kong.log("HIHI HIGH ERROR HERE")
         response_params = {
             [ERROR] = "invalid_client",
             error_description = "Invalid client authentication"
@@ -491,6 +496,7 @@ local function issue_token(conf)
                 }
 
             elseif not client then
+                kong.log("HIHI LOW ERROR HERE")
                 response_params = {
                     [ERROR] = "invalid_client",
                     error_description = "Invalid client authentication"
@@ -563,6 +569,7 @@ local function issue_token(conf)
             else
                 -- Check that the token belongs to the client application
                 if token.credential.id ~= client.id then
+                    kong.log("HIHI ZOO ERROR HERE")
                     response_params = {
                         [ERROR] = "invalid_client",
                         error_description = "Invalid client authentication"
@@ -911,15 +918,44 @@ function _M.execute(conf)
     end
 
     if kong.request.get_method() == "POST" then
+        local parameters = retrieve_parameters()
+        local grant_type = parameters[GRANT_TYPE]
         local path = kong.request.get_path()
 
         -- if path matches that of Login's API, issue token
         local from = string_find(path, "/v1/first-time/mobile/password/grant", nil, true)
+                        or string_find(path, "/v1/prelogin/grant", nil, true)
                         or string_find(path, "/v1/pin/grant", nil, true)
                         or string_find(path, "/v1/biometric/grant", nil, true)
-                        or string_find(path, "/v1/password/grant", nil, true)
+
+        local from_password = string_find(path, "/v1/password/grant", nil, true)
+
         if from then
             kong.log("path: ", from)
+            return issue_token(conf)
+        end
+
+        if from_password then
+            local ok, err = do_authentication(conf)
+            if not ok then
+                if conf.anonymous then
+                    -- get anonymous user
+                    local consumer_cache_key = kong.db.consumers:cache_key(conf.anonymous)
+                    local consumer, err      = kong.cache:get(consumer_cache_key, nil,
+                        kong.client.load_consumer,
+                        conf.anonymous, true)
+                    if err then
+                        kong.log.err("failed to load anonymous consumer:", err)
+                        return kong.response.exit(500, { message = "An unexpected error occurred" })
+                    end
+
+                    set_consumer(consumer, nil, nil)
+
+                else
+                    return kong.response.exit(err.status, err.message, err.headers)
+                end
+            end
+            kong.log("STATUS HERE: ", ok)
             return issue_token(conf)
         end
 
@@ -929,25 +965,25 @@ function _M.execute(conf)
         end
     end
 
-    local ok, err = do_authentication(conf)
-    if not ok then
-        if conf.anonymous then
-            -- get anonymous user
-            local consumer_cache_key = kong.db.consumers:cache_key(conf.anonymous)
-            local consumer, err      = kong.cache:get(consumer_cache_key, nil,
-                kong.client.load_consumer,
-                conf.anonymous, true)
-            if err then
-                kong.log.err("failed to load anonymous consumer:", err)
-                return kong.response.exit(500, { message = "An unexpected error occurred" })
-            end
+    -- local ok, err = do_authentication(conf)
+    -- if not ok then
+    --     if conf.anonymous then
+    --         -- get anonymous user
+    --         local consumer_cache_key = kong.db.consumers:cache_key(conf.anonymous)
+    --         local consumer, err      = kong.cache:get(consumer_cache_key, nil,
+    --             kong.client.load_consumer,
+    --             conf.anonymous, true)
+    --         if err then
+    --             kong.log.err("failed to load anonymous consumer:", err)
+    --             return kong.response.exit(500, { message = "An unexpected error occurred" })
+    --         end
 
-            set_consumer(consumer, nil, nil)
+    --         set_consumer(consumer, nil, nil)
 
-        else
-            return kong.response.exit(err.status, err.message, err.headers)
-        end
-    end
+    --     else
+    --         return kong.response.exit(err.status, err.message, err.headers)
+    --     end
+    -- end
     
     -- if path matches that of revoke token endpoint, delete the row of data in db
     local path = kong.request.get_path()
