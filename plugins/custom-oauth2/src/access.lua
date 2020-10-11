@@ -331,14 +331,40 @@ end
 local function retrieve_client_credentials(parameters, conf)
     local client_id, client_secret, from_authorization_header
     local authorization_header = kong.request.get_header(conf.auth_header_name)
+    local basic_authorization_header = kong.request.get_header("Basic-Authorization")
+    local path = kong.request.get_path()
+    local from_password = string_find(path, "/v1/password/grant", nil, true)
 
-    if parameters[CLIENT_ID] and parameters[CLIENT_SECRET] then
+    if (parameters[CLIENT_ID] and parameters[CLIENT_SECRET]) then
         client_id = parameters[CLIENT_ID]
         client_secret = parameters[CLIENT_SECRET]
 
+    elseif from_password then
+        from_authorization_header = true
+        local iterator, iter_err = ngx_re_gmatch(basic_authorization_header,
+            "\\s*[Bb]asic\\s*(.+)")
+        if not iterator then
+            kong.log.err(iter_err)
+            return
+        end
+
+        local m, err = iterator()
+        if err then
+            kong.log.err(err)
+            return
+        end
+
+        if m and next(m) then
+            local decoded_basic = ngx_decode_base64(m[1])
+            if decoded_basic then
+                local basic_parts = split(decoded_basic, ":")
+                client_id = basic_parts[1]
+                client_secret = basic_parts[2]
+            end
+        end
+
     elseif authorization_header then
         from_authorization_header = true
-
         local iterator, iter_err = ngx_re_gmatch(authorization_header,
             "\\s*[Bb]asic\\s*(.+)")
         if not iterator then
@@ -403,8 +429,6 @@ local function issue_token(conf)
     kong.log("ERROR: ", client_id, client_secret,from_authorization_header )
     -- Check client_id and redirect_uri
     local allowed_redirect_uris, client = get_redirect_uris(client_id)
-    kong.log("ERROR HERE PLEASE: ", allowed_redirect_uris)
-    kong.log("ERROR 2ND HERE PLEASE: ", client)
     if not (grant_type == GRANT_CLIENT_CREDENTIALS) then
         if allowed_redirect_uris then
             local redirect_uri = parameters[REDIRECT_URI] and
@@ -421,7 +445,6 @@ local function issue_token(conf)
             end
 
         else
-            kong.log("HIHI CRAZY ERROR HERE")
             response_params = {
                 [ERROR] = "invalid_client",
                 error_description = "Invalid client authentication"
@@ -437,7 +460,6 @@ local function issue_token(conf)
     end
 
     if client and client.client_secret ~= client_secret then
-        kong.log("HIHI HIGH ERROR HERE")
         response_params = {
             [ERROR] = "invalid_client",
             error_description = "Invalid client authentication"
@@ -496,7 +518,6 @@ local function issue_token(conf)
                 }
 
             elseif not client then
-                kong.log("HIHI LOW ERROR HERE")
                 response_params = {
                     [ERROR] = "invalid_client",
                     error_description = "Invalid client authentication"
@@ -935,7 +956,9 @@ function _M.execute(conf)
             return issue_token(conf)
         end
 
-        if from_password then
+        if from_password and grant_type == GRANT_REFRESH_TOKEN then
+            return issue_token(conf)
+        elseif from_password then
             local ok, err = do_authentication(conf)
             if not ok then
                 if conf.anonymous then
