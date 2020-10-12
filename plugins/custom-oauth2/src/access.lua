@@ -331,7 +331,6 @@ end
 local function retrieve_client_credentials(parameters, conf)
     local client_id, client_secret, from_authorization_header
     local authorization_header = kong.request.get_header(conf.auth_header_name)
-    local basic_authorization_header = kong.request.get_header("Basic-Authorization")
     local path = kong.request.get_path()
     local from_password = string_find(path, "/v1/password/grant", nil, true)
 
@@ -339,29 +338,9 @@ local function retrieve_client_credentials(parameters, conf)
         client_id = parameters[CLIENT_ID]
         client_secret = parameters[CLIENT_SECRET]
 
-    elseif from_password then
-        from_authorization_header = true
-        local iterator, iter_err = ngx_re_gmatch(basic_authorization_header,
-            "\\s*[Bb]asic\\s*(.+)")
-        if not iterator then
-            kong.log.err(iter_err)
-            return
-        end
-
-        local m, err = iterator()
-        if err then
-            kong.log.err(err)
-            return
-        end
-
-        if m and next(m) then
-            local decoded_basic = ngx_decode_base64(m[1])
-            if decoded_basic then
-                local basic_parts = split(decoded_basic, ":")
-                client_id = basic_parts[1]
-                client_secret = basic_parts[2]
-            end
-        end
+    elseif from_password and (conf.client_id or conf.client_secret) then
+        client_id = conf.client_id
+        client_secret = conf.client_secret
 
     elseif authorization_header then
         from_authorization_header = true
