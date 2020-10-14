@@ -190,6 +190,8 @@ function _M.transform_json_body(buffered_data, credential, headers)
 
   local json_body = read_json_body(buffered_data)
 
+  kong.ctx.shared.backend_response = json_body
+
   if json_body == nil then
     return
   end

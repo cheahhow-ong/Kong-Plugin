@@ -259,6 +259,13 @@ plugins:
       path: migrations
     - name: kong-plugin-custom-oauth2-daos
       path: daos
+  - name: kong-plugin-custom-session
+    pluginName: custom-session
+    subdirectories:
+    - name: kong-plugin-custom-session-migrations
+      path: migrations
+    - name: kong-plugin-custom-session-storage
+      path: storage
   # secrets:
   # - pluginName: rewriter
   #   name: kong-plugin-rewriter
