@@ -1,3 +1,3 @@
 return {
-  "000_base_session"
+  "000_base_custom_session"
 }

@@ -1,5 +1,5 @@
-local access = require "kong.plugins.session.access"
-local body_filter = require "kong.plugins.session.body_filter"
+local access = require "kong.plugins.custom-session.access"
+local body_filter = require "kong.plugins.custom-session.body_filter"
 -- local header_filter = require "kong.plugins.session.header_filter"
 local kong = kong
 local string_find = string.find

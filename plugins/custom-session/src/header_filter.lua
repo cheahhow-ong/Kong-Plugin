@@ -1,4 +1,4 @@
-local kong_session = require "kong.plugins.session.session"
+local kong_session = require "kong.plugins.custom-session.session"
 
 
 local ngx = ngx

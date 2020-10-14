@@ -31,7 +31,7 @@ end
 
 
 return {
-  name = "session",
+  name = "custom-session",
   fields = {
     { consumer = typedefs.no_consumer },
     { config = {

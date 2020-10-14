@@ -1,4 +1,4 @@
-local kong_storage = require "kong.plugins.session.storage.kong"
+local kong_storage = require "kong.plugins.custom-session.storage.kong"
 local resty_session = require "resty.session"
 
 
