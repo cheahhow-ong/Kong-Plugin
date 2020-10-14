@@ -11,6 +11,9 @@ return {
       { session_id = { type = "string", unique = true, required = true } },
       { expires = { type = "integer" } },
       { data = { type = "string" } },
+      { access_token = { type = "string" } },
+      { userRefId = { type = "string" } },
+      { corporateRefId = { type = "string" } },
       { created_at = typedefs.auto_timestamp_s },
     }
   }

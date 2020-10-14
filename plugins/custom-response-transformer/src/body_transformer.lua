@@ -93,7 +93,7 @@ local function build_jwt_payload(response_body, headers)
 
   if response_body ~= nil then
     for key, value in pairs(response_body) do
-      if key == "userRefNo" then
+      if key == "userRefId" then
         payload["userRefId"] = value
       else
         payload[key] = value
@@ -164,7 +164,7 @@ local function upsert_oauth2_token(body)
       service = token.service_id and { id = token.service_id } or nil,
       access_token = token.access_token,
       credential = { id = credential.id },
-      authenticated_userid = body.userRefNo,
+      authenticated_userid = body.userRefId,
       expires_in = token.expires_in,
       refresh_token = token.refresh_token,
       scope = body.scope,
@@ -218,13 +218,14 @@ function _M.transform_json_body(buffered_data, credential, headers)
     -- end
 
     local path = kong.request.get_path()
-    local firsttime = find(path, "/v1/first-time/mobile/password/grant", nil, true)
+    -- local firsttime = find(path, "/v1/first-time/mobile/password/grant", nil, true)
+    local prelogin = find(path, "/v1/prelogin/grant", nil, true)
     local pin = find(path, "/v1/pin/grant", nil, true)
     local biometric = find(path, "/v1/biometric/grant", nil, true)
     local password = find(path, "/v1/password/grant", nil, true)
 
-    if firsttime then
-      json_body["scope"] = "firsttime"
+    if prelogin then
+      json_body["scope"] = "prelogin"
     elseif pin then
       json_body["scope"] = "pin"
     elseif biometric then

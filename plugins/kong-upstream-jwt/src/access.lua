@@ -180,8 +180,8 @@ local function build_jwt_payload_hs256()
   local body, err, mimetype = kong.request.get_body()
   -- adds "userRefId" to the payload if the request has "userRefNo" in the body
   if body ~= nil then
-    if body.userRefNo then
-      payload["userRefId"] = body.userRefNo
+    for key, value in pairs(body) do
+      payload[key] = value
     end
   end
 
