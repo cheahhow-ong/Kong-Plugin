@@ -6,6 +6,9 @@ return {
         session_id      text UNIQUE,
         expires         int,
         data            text,
+        access_token    text UNIQUE,
+        userRefId       text UNIQUE,
+        corporateRefId  text UNIQUE,
         created_at      timestamp WITH TIME ZONE,
         ttl             timestamp WITH TIME ZONE,
         PRIMARY KEY (id)

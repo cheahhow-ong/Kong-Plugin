@@ -98,7 +98,7 @@ function _M.execute(conf)
     s.userRefId = backend_response.userRefId
     s.corporateRefId = backend_response.corporateRefId
     s:save()
-
+    
     if current_session then
         kong.db.sessions:delete({ id = current_session.id })
     end
