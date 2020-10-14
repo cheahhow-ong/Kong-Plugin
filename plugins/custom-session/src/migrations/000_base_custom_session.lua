@@ -2,15 +2,15 @@ return {
   postgres = {
     up = [[
       CREATE TABLE IF NOT EXISTS sessions(
-        id              uuid,
-        session_id      text UNIQUE,
-        expires         int,
-        data            text,
-        access_token    text UNIQUE,
-        userRefId       text UNIQUE,
-        corporateRefId  text UNIQUE,
-        created_at      timestamp WITH TIME ZONE,
-        ttl             timestamp WITH TIME ZONE,
+        id                uuid,
+        session_id        text UNIQUE,
+        expires           int,
+        data              text,
+        access_token      text UNIQUE,
+        user_ref_id       text UNIQUE,
+        corporate_ref_id  text UNIQUE,
+        created_at        timestamp WITH TIME ZONE,
+        ttl               timestamp WITH TIME ZONE,
         PRIMARY KEY (id)
       );
       DO $$

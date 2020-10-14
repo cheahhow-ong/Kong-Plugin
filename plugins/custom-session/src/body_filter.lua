@@ -90,18 +90,30 @@ local _M = {}
 function _M.execute(conf)
     local backend_response = kong.ctx.shared.backend_response
     local access_token = parse_access_token()
-    local current_session = kong.db.sessions:select_by_userRefId(backend_response.userRefId)
-
+    kong.log("userRefId: ", backend_response.userRefId)
+    kong.log("corporateRefId: ", backend_response.corporateRefId)
     -- create new session and save the data
-    local s = kong_session.open_session(conf)
-    s.access_token = access_token
-    s.userRefId = backend_response.userRefId
-    s.corporateRefId = backend_response.corporateRefId
-    s:save()
+    ngx.timer.at(0, function(premature)
+        -- local current_session = kong.db.sessions:select_by_user_ref_id(backend_response.userRefId)
+        local session, err = kong.db.sessions:upsert({
+            access_token = access_token,
+            user_ref_id = backend_response.userRefId,
+            corporate_ref_id = backend_response.corporateRefId
+        })
+
+        -- if current_session then
+        --     kong.db.sessions:delete({ id = current_session.id })
+        -- end
+    end)
+    -- local s = kong_session.open_session(conf)
+    -- s.access_token = access_token
+    -- s.userRefId = backend_response.userRefId
+    -- s.corporateRefId = backend_response.corporateRefId
+    -- s:save()
     
-    if current_session then
-        kong.db.sessions:delete({ id = current_session.id })
-    end
+    -- if current_session then
+    --     kong.db.sessions:delete({ id = current_session.id })
+    -- end
 end
 
 
