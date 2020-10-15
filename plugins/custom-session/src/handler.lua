@@ -4,7 +4,7 @@ local body_filter = require "kong.plugins.custom-session.body_filter"
 
 local KongSessionHandler = {
   PRIORITY = 800,
-  VERSION  = "2.4.2",
+  VERSION  = "1.0.1",
 }
 
 function KongSessionHandler.body_filter(_, conf)
@@ -15,8 +15,6 @@ function KongSessionHandler.body_filter(_, conf)
 
   if grant_flow then
     body_filter.execute(conf)
-  else
-    return
   end
 end
 
@@ -24,11 +22,10 @@ function KongSessionHandler.access(_, conf)
   local kong = kong
   local string_find = string.find
   local path = kong.request.get_path()
-  local grant_flow = string_find(path, "/v1/password/grant", nil, true)
+  local prelogin = string_find(path, "/v1/prelogin/grant", nil, true)
+  local password = string_find(path, "/v1/password/grant", nil, true)
 
-  if grant_flow then
-    return
-  else
+  if not prelogin or prelogin then
     access.execute(conf)
   end
 end

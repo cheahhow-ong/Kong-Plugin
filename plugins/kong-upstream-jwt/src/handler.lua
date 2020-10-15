@@ -11,16 +11,29 @@ end
 function KongUpstreamJWTHandler:access(conf)
   KongUpstreamJWTHandler.super.access(self)
 
-  local path = kong.request.get_path()
+  -- If request path matches one of the routes, a new empty JWT will be provisioned
+  -- Else, an existing JWT tied to the access token will be loaded
 
-  -- -- If request path matches one of the routes, a new empty JWT will be provisioned
-  -- -- Else, an existing JWT tied to the access token will be loaded
-  -- local from = string.find(path, "/v1/authorization/login", nil, true)
-  -- if from then
+  -- local path = kong.request.get_path()
+  -- local from = string_find(path, "/v1/prelogin/grant", nil, true)
+  --         or string_find(path, "/v1/activation/password/grant", nil, true)
+  --         or string_find(path, "/v1/biometric/grant", nil, true)
+  --         or string_find(path, "/v1/pin/grant", nil, true)
+  --         or string_find(path, "/v1/password/grant", nil, true)
+
+  local path = kong.request.get_path()
+  local string_find = string.find
+  local prelogin = string_find(path, "/v1/prelogin/grant", nil, true)
+  local activationPassword = string_find(path, "/v1/activation/password/grant", nil, true)
+  local pin = string_find(path, "/v1/pin/grant", nil, true)
+  local biometric = string_find(path, "/v1/biometric/grant", nil, true)
+  local password = string_find(path, "/v1/password/grant", nil, true)
+
+  if prelogin or activationPassword or pin or biometric or password then
     access.execute_hs256(conf)
-  -- else
-  --   access.add_existing_jwt_hs256(conf)
-  -- end
+  else
+    access.add_existing_jwt_hs256(conf)
+  end
 end
 
 KongUpstreamJWTHandler.PRIORITY = 899 -- This plugin needs to run after auth plugins so it has access to `ngx.ctx.authenticated_consumer`, and needs to run after rate limiting
