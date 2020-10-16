@@ -323,7 +323,7 @@ ingressController:
     repository: kong-docker-kubernetes-ingress-controller.bintray.io/kong-ingress-controller
     tag: 0.9.1
   args:
-  - --ingress-class=arief-test
+  - --ingress-class=kcorp
 
   # Specify Kong Ingress Controller configuration via environment variables
   env:
@@ -344,7 +344,7 @@ ingressController:
     failurePolicy: Fail
     port: 8080
 
-  ingressClass: arief-test
+  ingressClass: kcorp
 
   rbac:
     # Specifies whether RBAC resources should be created
@@ -757,4 +757,4 @@ clustertelemetry:
   type: ClusterIP
 
   externalIPs: []
-
+  
