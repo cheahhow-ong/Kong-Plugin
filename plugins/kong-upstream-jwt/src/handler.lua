@@ -1,5 +1,5 @@
 local BasePlugin = require "kong.plugins.base_plugin"
-local access = require "kong.plugins.upstream-jwt.access"
+local access = require "kong.plugins.kong-upstream-jwt.access"
 
 -- Extend Base Plugin and instantiate with a name of "kong-upstream-jwt"
 -- Ref: https://docs.konghq.com/latest/plugin-development/custom-logic/#handlerlua-specifications
