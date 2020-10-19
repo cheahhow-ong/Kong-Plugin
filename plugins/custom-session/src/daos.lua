@@ -12,8 +12,8 @@ return {
       { expires = { type = "integer" } },
       { data = { type = "string" } },
       { access_token = { type = "string", unique = true, required = true  } },
-      { userRefId = { type = "string", unique = true, required = true  } },
-      { corporateRefId = { type = "string", unique = true, required = true  } },
+      { user_ref_id = { type = "string", unique = true, required = true  } },
+      { corporate_ref_id = { type = "string", unique = true, required = true  } },
       { created_at = typedefs.auto_timestamp_s },
     }
   }

@@ -177,25 +177,22 @@ local function build_jwt_payload_hs256()
     iat = current_time
   }
 
+  -- adds all field from request body into JWT payload
   local body, err, mimetype = kong.request.get_body()
-  -- adds "userRefId" to the payload if the request has "userRefNo" in the body
   if body ~= nil then
     for key, value in pairs(body) do
       payload[key] = value
     end
   end
 
+  -- adds all headers of request into JWT payload
   local headers, err, mimetype = kong.request.get_headers()
-  -- adds "deviceId" and "userRefId" to the payload if the request has them in the header
-  if headers.x_device_id then
-    payload["deviceId"] = headers.x_device_id
+  if headers ~= nil then
+    for key, value in pairs(headers) do
+      payload[key] = value
+    end
   end
-  if headers.x_user_ref_no then
-    payload["userRefId"] = headers.x_user_ref_no
-  end
-  kong.log("headers.x_device_id: ", headers.x_device_id)
-  kong.log("headers.x_user_ref_no: ", headers.x_user_ref_no)
-
+  
   return payload
 end
 

@@ -512,7 +512,7 @@ tls:
 ## Configure metrics exporter
 ##
 metrics:
-  enabled: true # false
+  enabled: false
   # resources: {}
   service:
     type: ClusterIP
