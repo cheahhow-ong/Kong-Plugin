@@ -67,7 +67,7 @@ function ResponseTransformerHandler:body_filter()
 
     if eof then
       local chunks = concat(ctx.rt_body_chunks)
-      local body = body_transformer.transform_json_body(chunks, kong.ctx.shared.credential, kong.ctx.plugin.headers)
+      local body = body_transformer.transform_json_body(chunks, kong.ctx.shared.credential, kong.response.get_headers())
       ngx.arg[1] = body or chunks
 
     else
