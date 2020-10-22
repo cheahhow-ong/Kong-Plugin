@@ -148,7 +148,6 @@ end
 local function delete_old_oauth2_token(body)
   kong.log.inspect("userRefId: ", body.userRefId)
   kong.log.inspect("scope: ", body.scope)
-  local cache_key = kong.ctx.shared.cache_key
 
   ngx.timer.at(0, function(premature)
     local scope = body.scope
@@ -158,8 +157,16 @@ local function delete_old_oauth2_token(body)
     local con = assert (env:connect("mk", "mk", "mk"))
     local query = "UPDATE oauth2_tokens SET is_valid = false WHERE scope = '" .. scope .. "' AND authenticated_userid = '" .. authenticated_userid .. "';"
     local cur = assert (con:execute(query))
-    local cache_key = kong.db.oauth2_token:cache_key(body.userRefId)
-    local invalidate_var, invalidate_err = kong.cache:invalidate(cache_key)
+    local query_2 = "SELECT access_token from oauth2_tokens WHERE is_valid = false AND authenticated_userid = '" .. authenticated_userid .. "';"
+    local cur_2 = assert (con:execute(query_2))
+    local row = cur_2:fetch({}, "a")
+    while row do
+      -- print(string.format("Name: %s", row.Tables_in_dbname))
+      kong.log(string.format("Access token test 2: %s", row.access_token))
+      local cache_key = kong.db.oauth2_tokens:cache_key(row.access_token)
+      local invalidate_var, invalidate_err = kong.cache:invalidate(cache_key)
+      row = cur_2:fetch (row, "a")
+    end
     -- close everything
     cur:close()
     con:close()

@@ -807,11 +807,6 @@ local function do_authentication(conf)
             }
         }
     end
---    kong.log.inspect(token)
---    kong.log.inspect(access_token)
---    kong.cache:invalidate(kong.ctx.shared.cache_key)
---    local token_2 = kong.db.oauth2_tokens:select_by_access_token(access_token)
---    kong.log.inspect(token_2)
     if token.is_valid == false then
         return nil, {
             status = 401,
