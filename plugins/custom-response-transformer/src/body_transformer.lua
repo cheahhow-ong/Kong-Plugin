@@ -148,22 +148,25 @@ end
 local function delete_old_oauth2_token(body)
   kong.log.inspect("userRefId: ", body.userRefId)
   kong.log.inspect("scope: ", body.scope)
+  local cache_key = kong.ctx.shared.cache_key
 
   ngx.timer.at(0, function(premature)
-    local scope = "prelogin"
-    local authenticated_userid = "random"
+    local scope = body.scope
+    local authenticated_userid = body.userRefId
     -- sql query to delete by body.userrefid and body.scope
     local env = assert (luasql.postgres())
-    local con = assert (env:connect("kong", "kong", "password"))
-    local query = "DELETE from oauth2_tokens WHERE scope = '" .. scope .. "' AND authenticated_userid = '" .. authenticated_userid .. "';"
+    local con = assert (env:connect("mk", "mk", "mk"))
+    local query = "UPDATE oauth2_tokens SET is_valid = false WHERE scope = '" .. scope .. "' AND authenticated_userid = '" .. authenticated_userid .. "';"
     local cur = assert (con:execute(query))
-
+    local cache_key = kong.db.oauth2_token:cache_key(body.userRefId)
+    local invalidate_var, invalidate_err = kong.cache:invalidate(cache_key)
     -- close everything
     cur:close()
     con:close()
     env:close()
   end)
 end
+
 
 local function upsert_oauth2_token(body)
   local token = {}
