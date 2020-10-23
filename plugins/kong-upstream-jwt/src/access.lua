@@ -192,7 +192,21 @@ local function build_jwt_payload_hs256()
       payload[key] = value
     end
   end
-  
+
+  -- adds all required field (specified by BE) for JWT payload
+  local device_id_header, err, mimetype = kong.request.get_header("x-device-id")
+  if device_id_header ~= nil then
+    payload["deviceId"] = device_id_header
+  else
+    payload["deviceId"] = "SYSTEM"
+  end
+  payload["loginScope"] = "prelogin" -- hardcoded to prelogin because this function will only be used in prelogin flow, other flows will use the add_existing_jwt_header_hs256 function
+  payload["userRefId"] = "SYSTEM"
+  payload["userId"] = "SYSTEM"
+  payload["corporateRefId"] = "SYSTEM"
+  payload["companyId"] = "SYSTEM"
+  payload["mobileNo"] = "SYSTEM"
+
   return payload
 end
 
@@ -218,7 +232,7 @@ local function build_header_value(conf, jwt)
   end
 end
 
--- TODO: Add function description
+--- Retrieve access token from FE's request Authorization Header
 local function parse_access_token_hs265(conf)
   local found_in = {}
 
@@ -248,26 +262,59 @@ local function add_jwt_header(conf)
   ngx.req.set_header(conf.header, build_header_value(conf, jwt))
 end
 
---- Replaces the existing 'Authorization' header with a JWT unless specified in the configuration
--- @param conf specify header name
-local function add_jwt_header_hs256(conf)
-  local payload = build_jwt_payload_hs256()
-
-  -- Retrieve jwt secret of the current authenticated consumer
-  -- Store the jwt secret as credential to current request context data, to be used in custom-response-transformer
+-- Retrieve jwt secret of the current authenticated consumer
+-- Store the jwt secret as credential to current request context data, to be used in custom-response-transformer
+local function get_jwt_credential()
   local consumer = kong.client.get_consumer()
   local credential = load_credential(consumer.username)
   kong.ctx.shared.credential = credential
+
+  return credential
+end
+
+--- Replaces the existing 'Authorization' header with a JWT unless specified in the configuration
+-- @param conf specify header name
+local function add_jwt_header_hs256(conf)
+
+  local credential = get_jwt_credential()
+  local payload = build_jwt_payload_hs256()
 
   local jwt = encode_jwt_token_hs256(payload, (credential.secret))
   ngx.req.set_header(conf.header, build_header_value(conf, jwt))
 end
 
--- TODO: Add function description
+--- Appends JWT that was found in db using access_token to the header of request to be sent to BE
 local function add_existing_jwt_header_hs256(conf)
+  -- -- Retrieve jwt secret of the current authenticated consumer
+  -- -- Store the jwt secret as credential to current request context data, to be used in custom-response-transformer
+  -- local consumer = kong.client.get_consumer()
+  -- kong.log("consumer: ", consumer)
+  -- kong.log("consumer.username: ", consumer.username)
+
+  -- local credential = load_credential(consumer.username)
+  -- kong.ctx.shared.credential = credential
+  -- kong.log("load_credential(consumer.username): ", load_credential(consumer.username))
+
   local access_token = parse_access_token_hs265(conf)
   local token_details = kong.db.oauth2_tokens:select_by_access_token(access_token)
   ngx.req.set_header(conf.header, build_header_value(conf, token_details.jwt))
+end
+
+--- Stores x-device-id received from FE's request header in temporary table to be used in custom response transformer when upserting data (access token) into db
+local function save_device_id_from_header()
+  -- FYI, Header names in are case-insensitive and are normalized to lowercase, and dashes (-) can be written as underscores (_); that is, the header X-Custom-Header can also be retrieved as x_custom_header.
+  local device_id_header, err, mimetype = kong.request.get_header("x-device-id")
+  if device_id_header ~= nil then
+    kong.ctx.shared.device_id = device_id_header
+
+  end
+end
+
+--- Stores device_id in temporary table to be used in custom response transformer when upserting data (access token) into db, device_id is found using access_token from FE
+local function save_device_id_from_table(conf)
+  local access_token = parse_access_token_hs265(conf)
+  local token_details = kong.db.oauth2_tokens:select_by_access_token(access_token)
+  kong.ctx.shared.device_id = token_details.device_id
 end
 
 --- Execute the script
@@ -277,11 +324,17 @@ function _M.execute(conf)
 end
 
 function _M.execute_hs256(conf)
-  add_jwt_header_hs256(conf)
+  save_device_id_from_header(conf)
+  add_jwt_header_hs256(conf)  
 end
 
 function _M.add_existing_jwt_hs256(conf)
-  add_existing_jwt_header_hs256(conf)
+  save_device_id_from_table(conf) -- make sure this function executes before appending jwt in request's auth header because it requires access token from request coming from FE
+  add_existing_jwt_header_hs256(conf)  
+end
+
+function _M.execute_get_jwt_credential()
+  get_jwt_credential()  
 end
 
 return _M

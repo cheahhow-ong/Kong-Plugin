@@ -89,12 +89,30 @@ local function build_jwt_payload(response_body, headers)
     -- language = headers["Accept-Language"],
     -- clientVersion = headers["X-Client-Version"],
     -- deviceId = headers["X-Device-ID"]
+
+    -- default to SYSTEM for the following fields, if BE does return such fields, replace value in the next block of code
+    userRefId = "SYSTEM",
+    userId = "SYSTEM",
+    corporateRefId = "SYSTEM",
+    companyId = "SYSTEM",
+    mobileNo = "SYSTEM",
+    deviceId = kong.ctx.shared.device_id
   }
 
   if response_body ~= nil then
     for key, value in pairs(response_body) do
       if key == "userRefId" then
         payload["userRefId"] = value
+      elseif key == "userId" then
+        payload["userId"] = value
+      elseif key == "corporateRefId" then
+        payload["corporateRefId"] = value
+      elseif key == "companyId" then
+        payload["companyId"] = value
+      elseif key == "mobileNo" then
+        payload["mobileNo"] = value
+      elseif key == "loginScope" then
+        payload["loginScope"] = value
       else
         payload[key] = value
       end
@@ -157,7 +175,9 @@ local function upsert_oauth2_token(body)
     end
   end
 
-  ngx.timer.at(0, function(premature)
+  local local_device_id = kong.ctx.shared.device_id
+  
+    ngx.timer.at(0, function(premature)
     local token, err = kong.db.oauth2_tokens:upsert({
       id = token.id
     },{
@@ -167,8 +187,9 @@ local function upsert_oauth2_token(body)
       authenticated_userid = body.userRefId,
       expires_in = token.expires_in,
       refresh_token = token.refresh_token,
-      scope = body.scope,
-      jwt = body.jwt
+      scope = body.loginScope,
+      jwt = body.jwt,
+      device_id = local_device_id
     },{
       -- Access tokens (and their associated refresh token) are being
       -- permanently deleted after 'refresh_token_ttl' seconds
@@ -191,55 +212,43 @@ function _M.transform_json_body(buffered_data, credential, headers)
   local json_body = read_json_body(buffered_data)
 
   kong.ctx.shared.backend_response = json_body
-  kong.log("FUNNY ERROR: ", kong.ctx.shared.backend_response)
 
   if json_body == nil then
     return
   end
 
   if json_body["code"] and scope[json_body["code"]]then
-    json_body["scope"] = scope[json_body["code"]]
+    json_body["loginScope"] = scope[json_body["code"]]
     json_body["jwt"] = add_jwt_body_hs256(json_body, credential.secret, headers)
 
-    frontend_response["scope"] = json_body["scope"]
+    frontend_response["scope"] = json_body["loginScope"]
     frontend_response["jwt"] = json_body["jwt"]
   end
 
   if not json_body["code"] and kong.service.response.get_status() == 200 then
 
-    -- local path = kong.request.get_path()
-    -- local prelogin = find(path, "/v1/authorization/prelogin", nil, true)
-    -- local login = find(path, "/v1/authorization/login", nil, true)
-    -- local biometric = find(path, "/v1/authorization/biometric", nil, true)
-
-    -- if prelogin then
-    --   json_body["scope"] = "prelogin"
-    -- elseif login then
-    --   json_body["scope"] = "login"
-    -- elseif biometric then
-    --   json_body["scope"] = "biometric"
-    -- end
-
     local path = kong.request.get_path()
-    -- local firsttime = find(path, "/v1/first-time/mobile/password/grant", nil, true)
     local prelogin = find(path, "/v1/prelogin/grant", nil, true)
+    local firsttime = find(path, "/v1/activation/password/grant", nil, true)
     local pin = find(path, "/v1/pin/grant", nil, true)
     local biometric = find(path, "/v1/biometric/grant", nil, true)
     local password = find(path, "/v1/password/grant", nil, true)
 
     if prelogin then
-      json_body["scope"] = "prelogin"
+      json_body["loginScope"] = "prelogin"
+    elseif firsttime then
+      json_body["loginScope"] = "firsttime"
     elseif pin then
-      json_body["scope"] = "pin"
+      json_body["loginScope"] = "pin"
     elseif biometric then
-      json_body["scope"] = "biometric"
+      json_body["loginScope"] = "biometric"
     elseif password then
-      json_body["scope"] = "password"
+      json_body["loginScope"] = "password"
     end
 
     json_body["jwt"] = add_jwt_body_hs256(json_body, credential.secret, headers)
 
-    frontend_response["scope"] = json_body["scope"]
+    frontend_response["scope"] = json_body["loginScope"]
     frontend_response["jwt"] = json_body["jwt"]
   end
 
