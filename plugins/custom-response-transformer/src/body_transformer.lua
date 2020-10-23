@@ -165,14 +165,14 @@ end
 
 local function delete_old_oauth2_token(body)
   kong.log.inspect("userRefId: ", body.userRefId)
-  kong.log.inspect("scope: ", body.scope)
+  kong.log.inspect("scope: ", body.loginScope)
 
   ngx.timer.at(0, function(premature)
-    local scope = body.scope
+    local scope = body.loginScope
     local authenticated_userid = body.userRefId
     -- sql query to delete by body.userrefid and body.scope
     local env = assert (luasql.postgres())
-    local con = assert (env:connect("mk", "mk", "mk"))
+    local con = assert (env:connect("kong", "kong", "kong"))
     local query = "UPDATE oauth2_tokens SET is_valid = false WHERE scope = '" .. scope .. "' AND authenticated_userid = '" .. authenticated_userid .. "';"
     local cur = assert (con:execute(query))
     local query_2 = "SELECT access_token from oauth2_tokens WHERE is_valid = false AND authenticated_userid = '" .. authenticated_userid .. "';"
@@ -265,7 +265,6 @@ function _M.transform_json_body(buffered_data, credential, headers)
     json_body["jwt"] = add_jwt_body_hs256(json_body, credential.secret, headers)
 
     frontend_response["scope"] = json_body["loginScope"]
-    frontend_response["jwt"] = json_body["jwt"]
   end
 
   if not json_body["code"] and kong.service.response.get_status() == 200 then
@@ -284,7 +283,6 @@ function _M.transform_json_body(buffered_data, credential, headers)
     json_body["jwt"] = add_jwt_body_hs256(json_body, credential.secret, headers)
 
     frontend_response["scope"] = json_body["loginScope"]
-    frontend_response["jwt"] = json_body["jwt"]
   end
 
   -- Delete old token based on the scope and userRefId before upserting into the access token generated during this session

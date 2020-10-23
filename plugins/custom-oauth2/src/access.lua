@@ -105,7 +105,6 @@ scope, state, expiration, disable_refresh, token_id, token_jwt, token_ttl)
         return {
             access_token = token.access_token,
             scope = token.scope,
-            jwt = token.jwt,
             issued_at = token.created_at,
             token_type = "bearer",
             expires_in = token_expiration > 0 and token.expires_in or nil,
