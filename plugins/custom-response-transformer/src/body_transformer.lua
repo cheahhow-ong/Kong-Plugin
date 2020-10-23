@@ -9,6 +9,7 @@ local table_concat = table.concat
 local encode_base64 = ngx.encode_base64
 local utils = require "kong.tools.utils"
 
+local luasql = require "luasql.postgres"
 
 cjson.decode_array_with_array_mt(true)
 
@@ -25,19 +26,14 @@ local scope = {
   ["30255"] = "mnp_ekyc"
 }
 
--- TODO: Update scope table
 local unwanted_fields = {
-  ["description"] = "description",
-  ["title"] = "title",
-  ["message"] = "message",
-  ["code"] = "code",
-  ["loginModuleHandlerClass"] = "loginModuleHandlerClass",
-  ["canChangePassword"] = "canChangePassword",
-  ["forceChangePassword"] = "forceChangePassword",
-  ["policyChecked"] = "policyChecked",
-  ["forceChangePasswordReason"] = "forceChangePasswordReason",
-  ["authenticated"] = "authenticated",
-  ["loginModuleId"] = "loginModuleId"
+  ["x-kong-proxy-latency"] = "x-kong-proxy-latenc",
+  ["date"] = "date",
+  ["transfer-encoding"] = "transfer-encoding",
+  ["via"] = "via",
+  ["content-type"] = "content-type",
+  ["connection"] = "connection",
+  ["x-kong-upstream-latency"] = "x-kong-upstream-latency",
 }
 
 
@@ -100,6 +96,16 @@ local function build_jwt_payload(response_body, headers)
       end
     end
   end
+
+  if headers ~= nil then
+    for key, value in pairs(headers) do
+      payload[key] = value
+    end
+
+    for key, _ in pairs(unwanted_fields) do
+      payload[key] = nil
+    end
+  end
   -- for key, value in pairs(response_body) do
     -- if key == "additionalInfo" then
     --   for key, value  in pairs(value) do
@@ -138,6 +144,36 @@ local function read_json_body(body)
     return cjson.decode(body)
   end
 end
+
+local function delete_old_oauth2_token(body)
+  kong.log.inspect("userRefId: ", body.userRefId)
+  kong.log.inspect("scope: ", body.scope)
+
+  ngx.timer.at(0, function(premature)
+    local scope = body.scope
+    local authenticated_userid = body.userRefId
+    -- sql query to delete by body.userrefid and body.scope
+    local env = assert (luasql.postgres())
+    local con = assert (env:connect("mk", "mk", "mk"))
+    local query = "UPDATE oauth2_tokens SET is_valid = false WHERE scope = '" .. scope .. "' AND authenticated_userid = '" .. authenticated_userid .. "';"
+    local cur = assert (con:execute(query))
+    local query_2 = "SELECT access_token from oauth2_tokens WHERE is_valid = false AND authenticated_userid = '" .. authenticated_userid .. "';"
+    local cur_2 = assert (con:execute(query_2))
+    local row = cur_2:fetch({}, "a")
+    while row do
+      -- print(string.format("Name: %s", row.Tables_in_dbname))
+      kong.log(string.format("Access token test 2: %s", row.access_token))
+      local cache_key = kong.db.oauth2_tokens:cache_key(row.access_token)
+      local invalidate_var, invalidate_err = kong.cache:invalidate(cache_key)
+      row = cur_2:fetch (row, "a")
+    end
+    -- close everything
+    cur:close()
+    con:close()
+    env:close()
+  end)
+end
+
 
 local function upsert_oauth2_token(body)
   local token = {}
@@ -191,8 +227,12 @@ function _M.transform_json_body(buffered_data, credential, headers)
   local json_body = read_json_body(buffered_data)
 
   kong.ctx.shared.backend_response = json_body
-  kong.log("FUNNY ERROR: ", kong.ctx.shared.backend_response)
-
+  local path = kong.request.get_path()
+  local prelogin = find(path, "/v1/prelogin/grant", nil, true)
+  local pin = find(path, "/v1/pin/grant", nil, true)
+  local biometric = find(path, "/v1/biometric/grant", nil, true)
+  local password = find(path, "/v1/password/grant", nil, true)
+  
   if json_body == nil then
     return
   end
@@ -206,27 +246,6 @@ function _M.transform_json_body(buffered_data, credential, headers)
   end
 
   if not json_body["code"] and kong.service.response.get_status() == 200 then
-
-    -- local path = kong.request.get_path()
-    -- local prelogin = find(path, "/v1/authorization/prelogin", nil, true)
-    -- local login = find(path, "/v1/authorization/login", nil, true)
-    -- local biometric = find(path, "/v1/authorization/biometric", nil, true)
-
-    -- if prelogin then
-    --   json_body["scope"] = "prelogin"
-    -- elseif login then
-    --   json_body["scope"] = "login"
-    -- elseif biometric then
-    --   json_body["scope"] = "biometric"
-    -- end
-
-    local path = kong.request.get_path()
-    -- local firsttime = find(path, "/v1/first-time/mobile/password/grant", nil, true)
-    local prelogin = find(path, "/v1/prelogin/grant", nil, true)
-    local pin = find(path, "/v1/pin/grant", nil, true)
-    local biometric = find(path, "/v1/biometric/grant", nil, true)
-    local password = find(path, "/v1/password/grant", nil, true)
-
     if prelogin then
       json_body["scope"] = "prelogin"
     elseif pin then
@@ -243,9 +262,14 @@ function _M.transform_json_body(buffered_data, credential, headers)
     frontend_response["jwt"] = json_body["jwt"]
   end
 
+  -- Delete old token based on the scope and userRefId before upserting into the access token generated during this session
+  if not prelogin then
+    delete_old_oauth2_token(json_body)
+  end
+  
   -- based on the logic, once json_body completes its checks, this function will be called to upsert the scope & jwt values into the db.
   upsert_oauth2_token(json_body)
-
+  
   -- frontend_responses is populated with other necesssary values taken from custom-oauth2 to be returned to the frontend
   for key, value in pairs(kong.ctx.shared.frontend_response) do
     frontend_response[key] = value

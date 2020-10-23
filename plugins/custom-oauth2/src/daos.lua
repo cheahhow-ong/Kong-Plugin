@@ -76,6 +76,7 @@ local oauth2_tokens = {
     { refresh_token = { type = "string", required = false, unique = true }, },
     { authenticated_userid = { type = "string", required = false }, },
     { scope = { type = "string" }, },
+    { is_valid = { type = "boolean", default = true }, },
     { jwt = { type = "string", unique = true }, },
   },
 }
