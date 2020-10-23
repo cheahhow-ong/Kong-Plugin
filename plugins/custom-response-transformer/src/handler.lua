@@ -27,7 +27,7 @@ function ResponseTransformerHandler:header_filter(conf)
   end --]]
 end
 
---- As kong.db is inaccessible in the body filter phase, kong.ctx.shared.credential which was indexed in custom-upstream-jwt is use to pass in the credential
+--- As kong.db is inaccessible in the body filter phase, kong.ctx.shared.credential which was indexed in kong-upstream-jwt is use to pass in the credential
 function ResponseTransformerHandler:body_filter()
 
   local path = kong.request.get_path()
