@@ -9,5 +9,10 @@ return {
       END$$;
 
     ]],
+  },
+  cassandra = {
+    up = [[
+      ALTER TABLE oauth2_tokens ADD is_valid set<text>;
+    ]],
   }
 }
