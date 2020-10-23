@@ -375,18 +375,18 @@ local function issue_token(conf)
     local invalid_client_properties = {}
 
     local parameters = retrieve_parameters()
-
-    kong.log("parameters[REDIRECT_URI]: ", parameters[REDIRECT_URI])
-    kong.log("get_redirect_uris(parameters[CLIENT_ID]): ", get_redirect_uris(parameters[CLIENT_ID]))
-    kong.log("parameters[PROVISION_KEY]: ", parameters[PROVISION_KEY])
+--
+--    kong.log("parameters[REDIRECT_URI]: ", parameters[REDIRECT_URI])
+--    kong.log("get_redirect_uris(parameters[CLIENT_ID]): ", get_redirect_uris(parameters[CLIENT_ID]))
+--    kong.log("parameters[PROVISION_KEY]: ", parameters[PROVISION_KEY])
 
     parameters[PROVISION_KEY] = conf.provision_key
     parameters[AUTHENTICATED_USERID] = kong.request.get_header("X-Device-ID")
-    
-    kong.log("parameters[PROVISION_KEY]: ", parameters[PROVISION_KEY])
-    kong.log("conf.provision_key: ", conf.provision_key)
-    kong.log("conf:")
-    kong.log.inspect(conf)
+--
+--    kong.log("parameters[PROVISION_KEY]: ", parameters[PROVISION_KEY])
+--    kong.log("conf.provision_key: ", conf.provision_key)
+--    kong.log("conf:")
+--    kong.log.inspect(conf)
 
 
     local state = parameters[STATE]
@@ -657,6 +657,8 @@ local function retrieve_token(conf, access_token)
 
     if access_token then
         local token_cache_key = kong.db.oauth2_tokens:cache_key(access_token)
+        kong.ctx.shared.cache_key = token_cache_key
+        kong.log.inspect(token_cache_key)
         token, err = kong.cache:get(token_cache_key, nil,
             load_token, conf,
             kong.router.get_service(),
@@ -714,7 +716,7 @@ local function parse_access_token(conf)
             end
         end
     end
-
+    kong.ctx.shared.request_access_token = access_token
     return access_token
 end
 
@@ -788,6 +790,7 @@ local function do_authentication(conf)
             }
         }
     end
+    kong.log.inspect(access_token)
 
     local token = retrieve_token(conf, access_token)
     if not token then
@@ -795,12 +798,26 @@ local function do_authentication(conf)
             status = 401,
             message = {
                 [ERROR] = "invalid_token",
-                error_description = "The access token is invalid or has expired"
+                error_description = "The access token has expired"
             },
             headers = {
                 ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
                         '"invalid_token" error_description=' ..
-                        '"The access token is invalid or has expired"'
+                        '"The access token is has expired"'
+            }
+        }
+    end
+    if token.is_valid == false then
+        return nil, {
+            status = 401,
+            message = {
+                [ERROR] = "invalid_token",
+                error_description = "The access token is invalid"
+            },
+            headers = {
+                ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
+                        '"invalid_token" error_description=' ..
+                        '"The access token is invalid"'
             }
         }
     end
@@ -924,20 +941,18 @@ function _M.execute(conf)
 
         -- if path matches that of Login's API, issue token
         local from = string_find(path, "/v1/first-time/mobile/password/grant", nil, true)
-                        or string_find(path, "/v1/prelogin/grant", nil, true)
-                        or string_find(path, "/v1/pin/grant", nil, true)
-                        or string_find(path, "/v1/biometric/grant", nil, true)
+                or string_find(path, "/v1/password/grant", nil, true)
+                or string_find(path, "/v1/pin/grant", nil, true)
+                or string_find(path, "/v1/biometric/grant", nil, true)
+        local prelogin = string_find(path, "/v1/prelogin/grant", nil, true)
 
-        local from_password = string_find(path, "/v1/password/grant", nil, true)
-
-        if from then
-            kong.log("path: ", from)
+        if prelogin then
             return issue_token(conf)
         end
 
-        if from_password and grant_type == GRANT_REFRESH_TOKEN then
+        if from and grant_type == GRANT_REFRESH_TOKEN then
             return issue_token(conf)
-        elseif from_password then
+        elseif from then
             local ok, err = do_authentication(conf)
             if not ok then
                 if conf.anonymous then
@@ -957,7 +972,6 @@ function _M.execute(conf)
                     return kong.response.exit(err.status, err.message, err.headers)
                 end
             end
-            kong.log("STATUS HERE: ", ok)
             return issue_token(conf)
         end
 
@@ -967,26 +981,26 @@ function _M.execute(conf)
         end
     end
 
-    -- local ok, err = do_authentication(conf)
-    -- if not ok then
-    --     if conf.anonymous then
-    --         -- get anonymous user
-    --         local consumer_cache_key = kong.db.consumers:cache_key(conf.anonymous)
-    --         local consumer, err      = kong.cache:get(consumer_cache_key, nil,
-    --             kong.client.load_consumer,
-    --             conf.anonymous, true)
-    --         if err then
-    --             kong.log.err("failed to load anonymous consumer:", err)
-    --             return kong.response.exit(500, { message = "An unexpected error occurred" })
-    --         end
+    local ok, err = do_authentication(conf)
+    if not ok then
+        if conf.anonymous then
+            -- get anonymous user
+            local consumer_cache_key = kong.db.consumers:cache_key(conf.anonymous)
+            local consumer, err      = kong.cache:get(consumer_cache_key, nil,
+                kong.client.load_consumer,
+                conf.anonymous, true)
+            if err then
+                kong.log.err("failed to load anonymous consumer:", err)
+                return kong.response.exit(500, { message = "An unexpected error occurred" })
+            end
 
-    --         set_consumer(consumer, nil, nil)
+            set_consumer(consumer, nil, nil)
 
-    --     else
-    --         return kong.response.exit(err.status, err.message, err.headers)
-    --     end
-    -- end
-    
+        else
+            return kong.response.exit(err.status, err.message, err.headers)
+        end
+    end
+
     -- if path matches that of revoke token endpoint, delete the row of data in db
     local path = kong.request.get_path()
     local revoke = string_find(path, "/v1/revoke-token", nil, true)
