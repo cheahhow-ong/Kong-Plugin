@@ -1010,6 +1010,3 @@ function _M.execute(conf)
 end
 
 return _M
-
-
-local query = "select access_token from oauth2_tokens where authenticated_userid = '" userRefId "; and isValid=false;"
