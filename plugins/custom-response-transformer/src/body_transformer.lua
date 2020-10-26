@@ -260,6 +260,22 @@ function _M.transform_json_body(buffered_data, credential, headers)
     return
   end
 
+  -- frontend_responses is populated with all necesssary values taken from custom-oauth2 to be returned to the frontend
+  for key, value in pairs(kong.ctx.shared.frontend_response) do
+    frontend_response[key] = value
+  end
+
+  -- frontend_responses is populated with necesssary values taken from backend to be returned to the frontend
+  -- only for prelogin grant as for the other grants, frontend does not need anything else from backend
+  -- removes refresh_token and refresh_token_expires_in fields as prelogin grant is not supposed to have refresh token grant type
+  if prelogin then
+    for key, value in pairs(json_body) do
+      frontend_response[key] = value
+    end
+    frontend_response["refresh_token"] = nil
+    frontend_response["refresh_token_expires_in"] = nil
+  end
+
   if json_body["code"] and scope[json_body["code"]]then
     json_body["loginScope"] = scope[json_body["code"]]
     json_body["jwt"] = add_jwt_body_hs256(json_body, credential.secret, headers)
@@ -267,7 +283,8 @@ function _M.transform_json_body(buffered_data, credential, headers)
     frontend_response["scope"] = json_body["loginScope"]
   end
 
-  if not json_body["code"] and kong.service.response.get_status() == 200 then
+  -- if not json_body["code"] and kong.service.response.get_status() == 200 then
+  if kong.service.response.get_status() == 200 then
     if prelogin then
       json_body["loginScope"] = "prelogin"
     elseif firsttime then
@@ -293,11 +310,6 @@ function _M.transform_json_body(buffered_data, credential, headers)
   -- based on the logic, once json_body completes its checks, this function will be called to upsert the scope & jwt values into the db.
   upsert_oauth2_token(json_body)
   
-  -- frontend_responses is populated with other necesssary values taken from custom-oauth2 to be returned to the frontend
-  for key, value in pairs(kong.ctx.shared.frontend_response) do
-    frontend_response[key] = value
-  end
-
   return cjson.encode(frontend_response)
 end
 
