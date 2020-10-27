@@ -92,60 +92,14 @@ local function build_jwt_payload(response_body, headers)
     corporateRefId = "SYSTEM",
     companyId = "SYSTEM",
     mobileNo = "SYSTEM",
-    deviceId = kong.ctx.shared.device_id
+    deviceId = kong.ctx.shared.device_id or nil
   }
 
   if response_body ~= nil then
     for key, value in pairs(response_body) do
-      if key == "userRefId" then
-        payload["userRefId"] = value
-      elseif key == "userId" then
-        payload["userId"] = value
-      elseif key == "corporateRefId" then
-        payload["corporateRefId"] = value
-      elseif key == "companyId" then
-        payload["companyId"] = value
-      elseif key == "mobileNo" then
-        payload["mobileNo"] = value
-      elseif key == "loginScope" then
-        payload["loginScope"] = value
-      else
         payload[key] = value
-      end
     end
   end
-
-  if headers ~= nil then
-    for key, value in pairs(headers) do
-      payload[key] = value
-    end
-
-    for key, _ in pairs(unwanted_fields) do
-      payload[key] = nil
-    end
-  end
-  -- for key, value in pairs(response_body) do
-    -- if key == "additionalInfo" then
-    --   for key, value  in pairs(value) do
-    --     payload[key] = value
-    --   end
-    -- end
-    -- if key == "scope" and value ~= nil then
-    --   payload["loginScope"] = value
-    -- end
-    -- if key ~= "additionalInfo" and key ~= "scope" and value ~= nil then
-    --   payload[key] = value
-    -- end
-    -- if payload["loginScope"] ~= "prelogin" then
-    --   for key, _ in pairs(unwanted_fields) do
-    --     payload[key] = nil
-    --   end
-    -- end
-    -- -- TODO: Check whether this logic is required
-    -- if payload["loginScope"] == "pin" then
-    --   payload["language"] = "en-TH" -- is needed in the pin grant flow
-    -- end    
-  -- end
   return payload
 end
 
@@ -172,9 +126,10 @@ local function delete_old_oauth2_token(body)
     local authenticated_userid = body.userRefId
     -- sql query to delete by body.userrefid and body.scope
     local env = assert (luasql.postgres())
-    local con = assert (env:connect("kong", "kong", "kong"))
+    local con = assert (env:connect("mk", "mk", "mk"))
     local query = "UPDATE oauth2_tokens SET is_valid = false WHERE scope = '" .. scope .. "' AND authenticated_userid = '" .. authenticated_userid .. "';"
     local cur = assert (con:execute(query))
+
     local query_2 = "SELECT access_token from oauth2_tokens WHERE is_valid = false AND authenticated_userid = '" .. authenticated_userid .. "';"
     local cur_2 = assert (con:execute(query_2))
     local row = cur_2:fetch({}, "a")
@@ -201,14 +156,8 @@ local function upsert_oauth2_token(body)
     token[key] = value
   end
 
-  for key, value in pairs(kong.ctx.shared.token.credential) do
+  for _, value in pairs(kong.ctx.shared.token.credential) do
     credential.id = value
-  end
-
-  if body.additionalInfo then
-    for key, value in pairs (body.additionalInfo) do
-      body[key] = value
-    end
   end
 
   local local_device_id = kong.ctx.shared.device_id

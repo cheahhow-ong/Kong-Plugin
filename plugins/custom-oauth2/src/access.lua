@@ -374,20 +374,9 @@ local function issue_token(conf)
     local invalid_client_properties = {}
 
     local parameters = retrieve_parameters()
---
---    kong.log("parameters[REDIRECT_URI]: ", parameters[REDIRECT_URI])
---    kong.log("get_redirect_uris(parameters[CLIENT_ID]): ", get_redirect_uris(parameters[CLIENT_ID]))
---    kong.log("parameters[PROVISION_KEY]: ", parameters[PROVISION_KEY])
 
     parameters[PROVISION_KEY] = conf.provision_key
     parameters[AUTHENTICATED_USERID] = kong.request.get_header("X-Device-ID")
---
---    kong.log("parameters[PROVISION_KEY]: ", parameters[PROVISION_KEY])
---    kong.log("conf.provision_key: ", conf.provision_key)
---    kong.log("conf:")
---    kong.log.inspect(conf)
-
-
     local state = parameters[STATE]
 
     local grant_type = parameters[GRANT_TYPE]
@@ -666,7 +655,7 @@ local function retrieve_token(conf, access_token)
             return internal_server_error(err)
         end
     end
-
+    kong.ctx.shared.access_token_row = token
     return token
 end
 
@@ -715,7 +704,7 @@ local function parse_access_token(conf)
             end
         end
     end
-    kong.ctx.shared.request_access_token = access_token
+    kong.ctx.shared.access_token_string = access_token
     return access_token
 end
 

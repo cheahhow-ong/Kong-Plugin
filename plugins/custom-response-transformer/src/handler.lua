@@ -16,15 +16,6 @@ end
 
 function ResponseTransformerHandler:header_filter(conf)
   header_transformer.transform_headers(conf, kong.response.get_headers())
-
-  --[[ TODO: Check if this logic still applies
-  local prelogin = string.find(kong.request.get_path(), "/v1/auth/prelogin/grant", nil, true)
-  if prelogin then
-    local body = kong.service.response.get_body()
-    if (kong.response.get_status()==409 and body["code"]~="30020") then
-        kong.response.set_status(200)
-    end
-  end --]]
 end
 
 --- As kong.db is inaccessible in the body filter phase, kong.ctx.shared.credential which was indexed in kong-upstream-jwt is use to pass in the credential
