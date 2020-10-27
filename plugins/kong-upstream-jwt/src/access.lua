@@ -85,7 +85,7 @@ local function build_jwt_payload()
   payload["userRefId"] = "SYSTEM"
   payload["userId"] = "SYSTEM"
   payload["corporateRefId"] = "SYSTEM"
-  payload["companyId"] = "SYSTEM"
+  payload["corporateId"] = "SYSTEM"
   payload["mobileNo"] = "SYSTEM"
 
   return payload

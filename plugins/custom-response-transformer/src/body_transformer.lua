@@ -90,7 +90,7 @@ local function build_jwt_payload(response_body, headers)
     userRefId = "SYSTEM",
     userId = "SYSTEM",
     corporateRefId = "SYSTEM",
-    companyId = "SYSTEM",
+    corporateId = "SYSTEM",
     mobileNo = "SYSTEM",
     deviceId = kong.ctx.shared.device_id or nil
   }

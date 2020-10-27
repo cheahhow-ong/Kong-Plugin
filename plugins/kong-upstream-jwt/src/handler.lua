@@ -1,5 +1,7 @@
 local BasePlugin = require "kong.plugins.base_plugin"
 local access = require "kong.plugins.kong-upstream-jwt.access"
+local kong = kong
+local find = string.find
 
 -- Extend Base Plugin and instantiate with a name of "kong-upstream-jwt"
 -- Ref: https://docs.konghq.com/latest/plugin-development/custom-logic/#handlerlua-specifications
@@ -14,8 +16,7 @@ function KongUpstreamJWTHandler:access(conf)
   -- If request path matches one of the routes, a new empty JWT will be provisioned
   -- Else, an existing JWT tied to the access token will be loaded
   local path = kong.request.get_path()
-  local string_find = string.find
-  local prelogin = string_find(path, "/v1/prelogin/grant", nil, true)
+  local prelogin = find(path, "/v1/prelogin/grant", nil, true)
 
   if prelogin then
     access.execute(conf)
