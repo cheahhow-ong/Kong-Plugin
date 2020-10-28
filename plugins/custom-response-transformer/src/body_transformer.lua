@@ -92,7 +92,7 @@ local function build_jwt_payload(response_body, headers)
     corporateRefId = "SYSTEM",
     corporateId = "SYSTEM",
     mobileNo = "SYSTEM",
-    deviceId = kong.ctx.shared.device_id or nil
+    deviceId = kong.ctx.shared.device_id or "SYSTEM"
   }
 
   if response_body ~= nil then
