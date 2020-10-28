@@ -2,7 +2,7 @@ local _M = {}
 
 -- function to hold all errors that will be called in access.lua
 local function get_mapped_error(custom_error_code_and_language)
-    local eng = "en-EN"
+    local eng = "en-TH"
     local thai = "th-TH"
     local error_msg_mappings = {}
 
