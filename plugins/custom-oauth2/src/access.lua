@@ -184,7 +184,9 @@ local function retrieve_scope(parameters, conf)
         end
 
     elseif not scope and conf.mandatory_scope then
-        return nil, {[ERROR] = "invalid_scope", error_description = "You must specify a " .. SCOPE}
+        -- test
+        return nil, error.execute_get_generic_error("en-TH", "Kong error. error = invalid_scope. error_description = You must specify a scope")
+        -- return nil, {[ERROR] = "invalid_scope", error_description = "You must specify a " .. SCOPE}
     end
 
     if #scopes > 0 then
@@ -391,7 +393,7 @@ local function issue_token(conf)
                     grant_type == GRANT_CLIENT_CREDENTIALS) or
             (conf.enable_password_grant and grant_type == GRANT_PASSWORD)) then
         response_params = error.execute_get_mapped_error("80013" .. language_from_header)
-        -- {
+        -- response_params = {
         --     [ERROR] = "unsupported_grant_type",
         --     error_description = "Invalid " .. GRANT_TYPE .. ", grant_type: " .. grant_type
         -- }
@@ -450,10 +452,11 @@ local function issue_token(conf)
         kong.log("invalid_client here")
         kong.log("client and client.client_secret ~= client_secret: ", client and client.client_secret ~= client_secret)
         kong.log("client.client_secret ~= client_secret: ", client.client_secret ~= client_secret)
-        response_params = {
-            [ERROR] = "invalid_client",
-            error_description = "Invalid client authentication"
-        }
+        response_params = error.execute_get_generic_error("en-TH", "Kong error. error = invalid_client. error_description = Invalid client authentication")
+        -- response_params = {
+        --     [ERROR] = "invalid_client",
+        --     error_description = "Invalid client authentication"
+        -- }
 
         if from_authorization_header then
             invalid_client_properties = {
@@ -463,8 +466,13 @@ local function issue_token(conf)
         end
     end
 
-    if not response_params[ERROR] then
+    kong.log("check this outttt -> response_params[ERROR]: ", response_params[ERROR])
+    kong.log("check this outttt -> not response_params[ERROR: ", not response_params[ERROR])
+
+    if not response_params[ERROR] and not response_params["description"] then
+        kong.log("here1")
         if grant_type == GRANT_AUTHORIZATION_CODE then
+            kong.log("here2")
             local code = parameters[CODE]
 
             local service_id
@@ -499,6 +507,7 @@ local function issue_token(conf)
             end
 
         elseif grant_type == GRANT_CLIENT_CREDENTIALS then
+            kong.log("here3")
             -- Only check the provision_key if the authenticated_userid is being set
             if parameters.authenticated_userid and
                     conf.provision_key ~= parameters.provision_key then
@@ -531,6 +540,7 @@ local function issue_token(conf)
             end
 
         elseif grant_type == GRANT_PASSWORD then
+            kong.log("here4")
             -- Check that it comes from the right client
             if conf.provision_key ~= parameters.provision_key then
                 response_params = {
@@ -561,6 +571,7 @@ local function issue_token(conf)
             end
 
         elseif grant_type == GRANT_REFRESH_TOKEN then
+            kong.log("here5")
             local refresh_token = parameters[REFRESH_TOKEN]
 
             local service_id
@@ -609,8 +620,9 @@ local function issue_token(conf)
                     )
         end
     end
-
+    kong.log("here6")
     if response_params.access_token then
+        kong.log("here7")
         -- response_params contains most of the values required to be shown to the frontend
         -- used in response-transformer-custom to generate a consolidated frontend response
         kong.ctx.shared.frontend_response = response_params
@@ -621,17 +633,23 @@ local function issue_token(conf)
         kong.log("kong.ctx.shared.token: ")
         kong.log.inspect(kong.ctx.shared.token)
     else
+        kong.log("here8")
         kong.log("Access token is not successfully generated")
         -- return kong.response.exit(response_params[ERROR] and
-        return kong.response.exit(response_params and
-                (invalid_client_properties and
-                        invalid_client_properties.status or 400),
-            response_params, {
-                ["cache-control"] = "no-store",
-                ["pragma"] = "no-cache",
-                ["www-authenticate"] = invalid_client_properties and
-                        invalid_client_properties.www_authenticate
-            }
+        -- -- test
+        -- return kong.response.exit(response_params and
+        --         (invalid_client_properties and
+        --                 invalid_client_properties.status or 400),
+        --     response_params, {
+        --         ["cache-control"] = "no-store",
+        --         ["pragma"] = "no-cache",
+        --         ["www-authenticate"] = invalid_client_properties and
+        --                 invalid_client_properties.www_authenticate
+        --     }
+        -- )
+        -- return kong.response.exit((response_params[ERROR] or 500)  or 200,
+        return kong.response.exit(500,
+            response_params, response_params
         )
     end
 end
@@ -960,7 +978,7 @@ function _M.execute(conf)
         local path = kong.request.get_path()
 
         -- if path matches that of Login's API, issue token
-        local from = string_find(path, "/v1/first-time/mobile/password/grant", nil, true)
+        local from = string_find(path, "/v1/activation/password/grant", nil, true)
                 or string_find(path, "/v1/password/grant", nil, true)
                 or string_find(path, "/v1/pin/grant", nil, true)
                 or string_find(path, "/v1/biometric/grant", nil, true)
