@@ -428,6 +428,7 @@ local function issue_token(conf)
             end
 
         else
+            kong.log("invalid_client here")
             response_params = {
                 [ERROR] = "invalid_client",
                 error_description = "Invalid client authentication"
@@ -443,6 +444,12 @@ local function issue_token(conf)
     end
 
     if client and client.client_secret ~= client_secret then
+        kong.log("client: ", client)
+        kong.log("client.client_secret: ", client.client_secret)
+        kong.log("client_secret: ", client_secret)
+        kong.log("invalid_client here")
+        kong.log("client and client.client_secret ~= client_secret: ", client and client.client_secret ~= client_secret)
+        kong.log("client.client_secret ~= client_secret: ", client.client_secret ~= client_secret)
         response_params = {
             [ERROR] = "invalid_client",
             error_description = "Invalid client authentication"
@@ -501,6 +508,7 @@ local function issue_token(conf)
                 }
 
             elseif not client then
+                kong.log("invalid_client here")
                 response_params = {
                     [ERROR] = "invalid_client",
                     error_description = "Invalid client authentication"
