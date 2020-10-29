@@ -1,5 +1,5 @@
 local BasePlugin = require "kong.plugins.base_plugin"
-local access = require "kong.plugins.kong-upstream-jwt.access"
+local access = require "kong.plugins.upstream-jwt.access"
 local kong = kong
 local find = string.find
 
