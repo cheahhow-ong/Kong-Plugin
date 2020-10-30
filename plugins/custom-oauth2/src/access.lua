@@ -77,7 +77,12 @@ scope, state, expiration, disable_refresh, token_id, token_jwt, token_ttl)
     if  existing_refresh_token then
         -- Delete old token as a workaround to 'unique = true' constraint set for refresh tokens
         kong.db.oauth2_tokens:delete({ id = token_id })
-        refresh_token = existing_refresh_token
+        if token_ttl > 0 then
+            refresh_token = existing_refresh_token
+        else
+            kong.response.exit("something wrong") -- invalid refresh token or dont keep refresh token string the same
+        end
+
     else
         if not disable_refresh and token_expiration > 0 then
             refresh_token = random_string()
