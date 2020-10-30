@@ -383,7 +383,7 @@ local function issue_token(conf)
 
     local language_from_header = kong.request.get_header("Accept-Language")
     parameters[PROVISION_KEY] = conf.provision_key
-    parameters[AUTHENTICATED_USERID] = kong.request.get_header("X-Device-ID")
+    parameters[AUTHENTICATED_USERID] = "SYSTEM"
     local state = parameters[STATE]
 
     local grant_type = parameters[GRANT_TYPE]
