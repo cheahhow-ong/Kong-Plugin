@@ -169,7 +169,7 @@ local function upsert_oauth2_token(body)
       service = token.service_id and { id = token.service_id } or nil,
       access_token = token.access_token,
       credential = { id = credential.id },
-      authenticated_userid = body.userRefId,
+      authenticated_userid = body.userRefId or SYSTEM,
       expires_in = token.expires_in,
       refresh_token = token.refresh_token,
       scope = body.loginScope,
