@@ -338,7 +338,10 @@ local function retrieve_client_credentials(parameters, conf)
     local client_id, client_secret, from_authorization_header
     local authorization_header = kong.request.get_header(conf.auth_header_name)
     local path = kong.request.get_path()
-    local from_password = string_find(path, "/v1/password/grant", nil, true)
+    local from_password = string_find(path, "/v1/activation/password/grant", nil, true)
+            or string_find(path, "/v1/password/grant", nil, true)
+            or string_find(path, "/v1/pin/grant", nil, true)
+            or string_find(path, "/v1/biometric/grant", nil, true)
 
     if (parameters[CLIENT_ID] and parameters[CLIENT_SECRET]) then
         client_id = parameters[CLIENT_ID]
