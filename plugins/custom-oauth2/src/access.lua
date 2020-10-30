@@ -392,6 +392,20 @@ local function issue_token(conf)
             (conf.enable_client_credentials and
                     grant_type == GRANT_CLIENT_CREDENTIALS) or
             (conf.enable_password_grant and grant_type == GRANT_PASSWORD)) then
+        kong.log("conf.enable_password_grant: ", conf.enable_password_grant)
+        kong.log("grant_type == GRANT_PASSWORD: ", grant_type == GRANT_PASSWORD)
+        kong.log("conf.enable_password_grant and grant_type == GRANT_PASSWORD: ", conf.enable_password_grant and grant_type == GRANT_PASSWORD)
+        kong.log("grant_type == GRANT_AUTHORIZATION_CODE: ", grant_type == GRANT_AUTHORIZATION_CODE)
+        kong.log("grant_type == GRANT_REFRESH_TOKEN: ", grant_type == GRANT_REFRESH_TOKEN)
+        kong.log("conf.enable_client_credentials and grant_type == GRANT_CLIENT_CREDENTIALS: ", conf.enable_client_credentials and grant_type == GRANT_CLIENT_CREDENTIALS)
+        kong.log("grant_type == GRANT_CLIENT_CREDENTIALS: ", grant_type == GRANT_CLIENT_CREDENTIALS)
+        kong.log("conf.enable_client_credentials: ", conf.enable_client_credentials)
+        kong.log("full thing: ", grant_type == GRANT_AUTHORIZATION_CODE or
+        grant_type == GRANT_REFRESH_TOKEN or
+        (conf.enable_client_credentials and
+                grant_type == GRANT_CLIENT_CREDENTIALS) or
+        (conf.enable_password_grant and grant_type == GRANT_PASSWORD))
+
         response_params = error.execute_get_mapped_error("80013" .. language_from_header)
         -- response_params = {
         --     [ERROR] = "unsupported_grant_type",
