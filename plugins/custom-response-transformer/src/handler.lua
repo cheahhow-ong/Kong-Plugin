@@ -22,7 +22,7 @@ end
 function ResponseTransformerHandler:body_filter()
 
   local path = kong.request.get_path()
-  local first_time_path = string.find(path, "/v1/first-time/mobile/password/grant", nil, true)
+  local first_time_path = string.find(path, "/v1/activation/password/grant", nil, true)
   local biometric_path = string.find(path, "/v1/biometric/grant", nil, true)
   local password_path = string.find(path, "/v1/password/grant", nil, true)
   local pin_path = string.find(path, "/v1/pin/grant", nil, true)

@@ -381,7 +381,7 @@ local function issue_token(conf)
 
     local language_from_header = kong.request.get_header("Accept-Language")
     parameters[PROVISION_KEY] = conf.provision_key
-    parameters[AUTHENTICATED_USERID] = kong.request.get_header("X-Device-ID")
+    parameters[AUTHENTICATED_USERID] = "SYSTEM"
     local state = parameters[STATE]
 
     local grant_type = parameters[GRANT_TYPE]
@@ -952,7 +952,7 @@ function _M.execute(conf)
         local path = kong.request.get_path()
 
         -- if path matches that of Login's API, issue token
-        local from = string_find(path, "/v1/first-time/mobile/password/grant", nil, true)
+        local from = string_find(path, "/v1/activation/password/grant", nil, true)
                 or string_find(path, "/v1/password/grant", nil, true)
                 or string_find(path, "/v1/pin/grant", nil, true)
                 or string_find(path, "/v1/biometric/grant", nil, true)
