@@ -164,6 +164,7 @@ local function retrieve_parameters()
 end
 
 local function retrieve_scope(parameters, conf)
+    local language_from_header = kong.request.get_header("Accept-Language")
     local scope = parameters[SCOPE]
     local scopes = {}
 
@@ -184,7 +185,9 @@ local function retrieve_scope(parameters, conf)
         end
 
     elseif not scope and conf.mandatory_scope then
-        return nil, {[ERROR] = "invalid_scope", error_description = "You must specify a " .. SCOPE}
+        -- test
+        return nil, error.execute_get_generic_error(language_from_header, "Kong error. error = invalid_scope. error_description = You must specify a scope")
+        -- return nil, {[ERROR] = "invalid_scope", error_description = "You must specify a " .. SCOPE}
     end
 
     if #scopes > 0 then
@@ -262,7 +265,7 @@ local function authorize(conf)
         parsed_redirect_uri = url.parse(redirect_uri)
 
         -- If there are no errors, keep processing the request
-        if not response_params[ERROR] then
+        if not response_params[ERROR] and not not response_params["description"] then
             if response_type == CODE then
                 local service_id
                 if not conf.global_credentials then
@@ -385,11 +388,27 @@ local function issue_token(conf)
     local state = parameters[STATE]
 
     local grant_type = parameters[GRANT_TYPE]
-    if not (grant_type == GRANT_AUTHORIZATION_CODE or
+    if not ((conf.enable_authorization_code and
+            grant_type == GRANT_AUTHORIZATION_CODE) or
             grant_type == GRANT_REFRESH_TOKEN or
             (conf.enable_client_credentials and
                     grant_type == GRANT_CLIENT_CREDENTIALS) or
             (conf.enable_password_grant and grant_type == GRANT_PASSWORD)) then
+            
+        kong.log("conf.enable_password_grant: ", conf.enable_password_grant)
+        kong.log("grant_type == GRANT_PASSWORD: ", grant_type == GRANT_PASSWORD)
+        kong.log("conf.enable_password_grant and grant_type == GRANT_PASSWORD: ", conf.enable_password_grant and grant_type == GRANT_PASSWORD)
+        kong.log("grant_type == GRANT_AUTHORIZATION_CODE: ", grant_type == GRANT_AUTHORIZATION_CODE)
+        kong.log("grant_type == GRANT_REFRESH_TOKEN: ", grant_type == GRANT_REFRESH_TOKEN)
+        kong.log("conf.enable_client_credentials and grant_type == GRANT_CLIENT_CREDENTIALS: ", conf.enable_client_credentials and grant_type == GRANT_CLIENT_CREDENTIALS)
+        kong.log("grant_type == GRANT_CLIENT_CREDENTIALS: ", grant_type == GRANT_CLIENT_CREDENTIALS)
+        kong.log("conf.enable_client_credentials: ", conf.enable_client_credentials)
+        kong.log("full thing: ", grant_type == GRANT_AUTHORIZATION_CODE or
+        grant_type == GRANT_REFRESH_TOKEN or
+        (conf.enable_client_credentials and
+                grant_type == GRANT_CLIENT_CREDENTIALS) or
+        (conf.enable_password_grant and grant_type == GRANT_PASSWORD))
+        
         response_params = error.execute_get_mapped_error("80013" .. language_from_header)
         -- {
         --     [ERROR] = "unsupported_grant_type",
@@ -428,6 +447,7 @@ local function issue_token(conf)
             end
 
         else
+            kong.log("invalid_client here")
             response_params = {
                 [ERROR] = "invalid_client",
                 error_description = "Invalid client authentication"
@@ -443,6 +463,14 @@ local function issue_token(conf)
     end
 
     if client and client.client_secret ~= client_secret then
+        kong.log("client: ", client)
+        kong.log("client.client_secret: ", client.client_secret)
+        kong.log("client_secret: ", client_secret)
+        kong.log("invalid_client here")
+        kong.log("client and client.client_secret ~= client_secret: ", client and client.client_secret ~= client_secret)	
+        kong.log("client.client_secret ~= client_secret: ", client.client_secret ~= client_secret)
+
+        response_params = error.execute_get_generic_error(language_from_header, "Kong error. error = invalid_client. error_description = Invalid client authentication")
         response_params = {
             [ERROR] = "invalid_client",
             error_description = "Invalid client authentication"
@@ -456,8 +484,10 @@ local function issue_token(conf)
         end
     end
 
-    if not response_params[ERROR] then
+    if not response_params[ERROR] and not response_params["description"] then
+        kong.log("here1")
         if grant_type == GRANT_AUTHORIZATION_CODE then
+            kong.log("here2")
             local code = parameters[CODE]
 
             local service_id
@@ -492,6 +522,7 @@ local function issue_token(conf)
             end
 
         elseif grant_type == GRANT_CLIENT_CREDENTIALS then
+            kong.log("here3")
             -- Only check the provision_key if the authenticated_userid is being set
             if parameters.authenticated_userid and
                     conf.provision_key ~= parameters.provision_key then
@@ -501,6 +532,7 @@ local function issue_token(conf)
                 }
 
             elseif not client then
+                kong.log("invalid_client here")
                 response_params = {
                     [ERROR] = "invalid_client",
                     error_description = "Invalid client authentication"
@@ -523,6 +555,7 @@ local function issue_token(conf)
             end
 
         elseif grant_type == GRANT_PASSWORD then
+            kong.log("here4")
             -- Check that it comes from the right client
             if conf.provision_key ~= parameters.provision_key then
                 response_params = {
@@ -553,6 +586,7 @@ local function issue_token(conf)
             end
 
         elseif grant_type == GRANT_REFRESH_TOKEN then
+            kong.log("here5")
             local refresh_token = parameters[REFRESH_TOKEN]
 
             local service_id
@@ -601,8 +635,9 @@ local function issue_token(conf)
                     )
         end
     end
-
+    kong.log("here6")
     if response_params.access_token then
+        kong.log("here7")
         -- response_params contains most of the values required to be shown to the frontend
         -- used in response-transformer-custom to generate a consolidated frontend response
         kong.ctx.shared.frontend_response = response_params
@@ -613,16 +648,25 @@ local function issue_token(conf)
         kong.log("kong.ctx.shared.token: ")
         kong.log.inspect(kong.ctx.shared.token)
     else
+        kong.log("here8")
         kong.log("Access token is not successfully generated")
         -- return kong.response.exit(response_params[ERROR] and
-        return kong.response.exit(response_params and
-                (invalid_client_properties and
-                        invalid_client_properties.status or 400),
+        -- -- test
+        -- return kong.response.exit(response_params and
+        --         (invalid_client_properties and
+        --                 invalid_client_properties.status or 400),
+        --     response_params, {
+        --         ["cache-control"] = "no-store",
+        --         ["pragma"] = "no-cache",
+        --         ["www-authenticate"] = invalid_client_properties and
+        --                 invalid_client_properties.www_authenticate
+        --     }
+        -- )
+        -- return kong.response.exit((response_params[ERROR] or 500)  or 200,
+        return kong.response.exit(500,
             response_params, {
                 ["cache-control"] = "no-store",
-                ["pragma"] = "no-cache",
-                ["www-authenticate"] = invalid_client_properties and
-                        invalid_client_properties.www_authenticate
+                ["pragma"] = "no-cache"
             }
         )
     end
@@ -840,14 +884,15 @@ local function do_authentication(conf)
                     not conf.global_credentials) then
         return nil, {
             status = 401,
-            message = {
-                [ERROR] = "invalid_token",
-                error_description = "The access token is invalid or has expired"
-            },
+            message = error.execute_get_mapped_error("80015".. language_from_header),
+            -- message = {
+            --     [ERROR] = "invalid_token",
+            --     error_description = "The access token is invalid or has expired"
+            -- },
             headers = {
                 ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
                         '"invalid_token" error_description=' ..
-                        '"The access token is invalid or has expired"'
+                        '"The access token is invalid"'
             }
         }
     end
@@ -858,10 +903,11 @@ local function do_authentication(conf)
         if now - token.created_at > token.expires_in then
             return nil, {
                 status = 401,
-                message = {
-                    [ERROR] = "invalid_token",
-                    error_description = "The access token is invalid or has expired"
-                },
+                message = error.execute_get_mapped_error("80015".. language_from_header),
+                -- message = {
+                --     [ERROR] = "invalid_token",
+                --     error_description = "The access token is invalid or has expired"
+                -- },
                 headers = {
                     ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
                             '"invalid_token" error_description=' ..
