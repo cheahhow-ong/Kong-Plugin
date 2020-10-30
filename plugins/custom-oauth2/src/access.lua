@@ -264,7 +264,7 @@ local function authorize(conf)
         parsed_redirect_uri = url.parse(redirect_uri)
 
         -- If there are no errors, keep processing the request
-        if not response_params[ERROR] then
+        if not response_params[ERROR] and not not response_params["description"] then
             if response_type == CODE then
                 local service_id
                 if not conf.global_credentials then
@@ -649,7 +649,10 @@ local function issue_token(conf)
         -- )
         -- return kong.response.exit((response_params[ERROR] or 500)  or 200,
         return kong.response.exit(500,
-            response_params, response_params
+            response_params, {
+                ["cache-control"] = "no-store",
+                ["pragma"] = "no-cache"
+            }
         )
     end
 end
