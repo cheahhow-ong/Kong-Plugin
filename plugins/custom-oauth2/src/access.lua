@@ -175,7 +175,7 @@ local function retrieve_scope(parameters, conf, language_from_header)
 
         for v in scope:gmatch("%S+") do
             if not table_contains(conf.scopes, v) then
-                error.execute_get_generic_error(language_from_header, "error = invalid_scope. error_description = \"" .. v .. "\" is an invalid " .. SCOPE)
+                return nil, error.execute_get_generic_error(language_from_header, "error = invalid_scope. error_description = \"" .. v .. "\" is an invalid " .. SCOPE)
                 -- return nil, {
                 --     [ERROR] = "invalid_scope", 
                 --     error_description = "\"" .. v .. "\" is an invalid " .. SCOPE
@@ -600,7 +600,9 @@ local function issue_token(conf)
 
             -- if not token or (service_id and service_id ~= token.service.id) then
             if not token then
-                response_params = error.execute_get_generic_error(language_from_header, "error = invalid_request. error_description = Invalid " .. REFRESH_TOKEN)
+                -- here refresh token
+                response_params = error.execute_get_mapped_error("80012" .. language_from_header)
+                -- response_params = error.execute_get_generic_error(language_from_header, "error = invalid_request. error_description = Invalid " .. REFRESH_TOKEN)
                 -- response_params = {
                 --     [ERROR] = "invalid_request",
                 --     error_description = "Invalid " .. REFRESH_TOKEN
@@ -676,6 +678,7 @@ local function issue_token(conf)
 end
 
 local function load_token(conf, service, access_token)
+    local language_from_header = kong.request.get_header("Accept-Language") -- get language from frontend request header
     local credentials, err =
     kong.db.oauth2_tokens:select_by_access_token(access_token)
 
@@ -689,7 +692,7 @@ local function load_token(conf, service, access_token)
 
     if not conf.global_credentials then
         if not credentials.service then
-            return kong.response.exit(401, error.execute_get_generic_error(language_from_header, "error = invalid_token. error_description = The access token is global, but the current " .. "plugin is configured without 'global_credentials'"))
+            return kong.response.exit(500, error.execute_get_generic_error(language_from_header, "error = invalid_token. error_description = The access token is global, but the current " .. "plugin is configured without 'global_credentials'"))
             -- return kong.response.exit(401, {
             --     [ERROR] = "invalid_token",
             --     error_description = "The access token is global, but the current " ..
@@ -893,7 +896,7 @@ local function do_authentication(conf, language_from_header)
             headers = {
                 ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
                         '"invalid_token" error_description=' ..
-                        '"The access token is invalid"'
+                        '"The access token is expired"'
             }
         }
     end
@@ -912,7 +915,7 @@ local function do_authentication(conf, language_from_header)
                 headers = {
                     ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
                             '"invalid_token" error_description=' ..
-                            '"The access token is invalid"'
+                            '"The access token is expired"'
                 }
             }
         end
