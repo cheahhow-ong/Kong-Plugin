@@ -55,6 +55,7 @@ env:
   proxy_listen: 0.0.0.0:8000, 0.0.0.0:8443 ssl
   ssl_cert: /etc/secrets/kong-cert/gtbdev-vayucloud.krungthai.cer
   ssl_cert_key: /etc/secrets/kong-cert/gtbdev-vayucloud.krungthai.key
+  headers: "off"
 
 # Specify Kong's Docker image and repository details here
 image:
