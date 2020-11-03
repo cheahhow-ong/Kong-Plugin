@@ -49,8 +49,10 @@ local ERROR = "error"
 local AUTHENTICATED_USERID = "authenticated_userid"
 
 local function internal_server_error(err)
+    local language_from_header = kong.request.get_header("Accept-Language")
     kong.log.err(err)
-    return kong.response.exit(500, { message = "An unexpected error occurred" })
+    return kong.response.exit(500, error.execute_get_generic_error(language_from_header, "An unexpected error occurred"))
+    -- return kong.response.exit(500, { message = "An unexpected error occurred" })
 end
 
 --- If there is an existing refresh token, the 'if existing_refresh_token' logic will delete the existing token based on 'token.id'
@@ -1026,7 +1028,8 @@ function _M.execute(conf)
                         conf.anonymous, true)
                     if err then
                         kong.log.err("failed to load anonymous consumer:", err)
-                        return kong.response.exit(500, { message = "An unexpected error occurred" })
+                        -- return kong.response.exit(500, { message = "An unexpected error occurred" })
+                        return internal_server_error(err)
                     end
 
                     set_consumer(consumer, nil, nil)
@@ -1054,7 +1057,8 @@ function _M.execute(conf)
                 conf.anonymous, true)
             if err then
                 kong.log.err("failed to load anonymous consumer:", err)
-                return kong.response.exit(500, { message = "An unexpected error occurred" })
+                -- return kong.response.exit(500, { message = "An unexpected error occurred" })
+                return internal_server_error(err)
             end
 
             set_consumer(consumer, nil, nil)
