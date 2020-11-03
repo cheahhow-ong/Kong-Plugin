@@ -126,26 +126,39 @@ local function get_mapped_error(custom_error_code_and_language)
 end
 
 local function get_generic_error(language, description)
-    local eng = "en-EN"
+    local eng = "en-TH"
     local thai = "th-TH"
     local error_msg_mappings = {}
 
+    kong.log("language: ", language)
+    kong.log("description: ", description)
+    
     -- in english
-    error_msg_mappings["80000" .. eng] = {
+    error_msg_mappings[eng] = {
         ["code"] = "80000",
         ["title"] = "Unable to proceed",
         ["description"] = description,
         ["message"] = "Please try again."
     }
 
+    kong.log("error_msg_mappings[eng]")
+    kong.log.inspect(error_msg_mappings[eng])
+
     -- in thai
-    error_msg_mappings["80000" .. thai] = {
+    error_msg_mappings[thai] = {
         ["code"] = "80000",
         ["title"] = "ไม่สามารถทำรายการได้",
         ["description"] = description,
         ["message"] = "กรุณาลองใหม่อีกครั้ง"
     }
 
+    kong.log("error_msg_mappings[thai]")
+    kong.log.inspect(error_msg_mappings[thai])
+
+    kong.log("error_msg_mappings[language]")
+    kong.log.inspect(error_msg_mappings[language])
+
+    return error_msg_mappings[language]
 end
 
 function _M.execute_get_mapped_error(custom_error_code_and_language)
