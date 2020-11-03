@@ -346,7 +346,10 @@ local function retrieve_client_credentials(parameters, conf)
     local client_id, client_secret, from_authorization_header
     local authorization_header = kong.request.get_header(conf.auth_header_name)
     local path = kong.request.get_path()
-    local from_password = string_find(path, "/v1/password/grant", nil, true)
+    local from_password = string_find(path, "/v1/activation/password/grant", nil, true)
+            or string_find(path, "/v1/password/grant", nil, true)
+            or string_find(path, "/v1/pin/grant", nil, true)
+            or string_find(path, "/v1/biometric/grant", nil, true)
 
     if (parameters[CLIENT_ID] and parameters[CLIENT_SECRET]) then
         client_id = parameters[CLIENT_ID]
@@ -395,25 +398,18 @@ local function issue_token(conf)
     local state = parameters[STATE]
 
     local grant_type = parameters[GRANT_TYPE]
-    if not (grant_type == GRANT_AUTHORIZATION_CODE or
+    if not ((conf.enable_authorization_code and
+            grant_type == GRANT_AUTHORIZATION_CODE) or
             grant_type == GRANT_REFRESH_TOKEN or
             (conf.enable_client_credentials and
                     grant_type == GRANT_CLIENT_CREDENTIALS) or
             (conf.enable_password_grant and grant_type == GRANT_PASSWORD)) then
-        kong.log("conf.enable_password_grant: ", conf.enable_password_grant)
-        kong.log("grant_type == GRANT_PASSWORD: ", grant_type == GRANT_PASSWORD)
-        kong.log("conf.enable_password_grant and grant_type == GRANT_PASSWORD: ", conf.enable_password_grant and grant_type == GRANT_PASSWORD)
-        kong.log("grant_type == GRANT_AUTHORIZATION_CODE: ", grant_type == GRANT_AUTHORIZATION_CODE)
-        kong.log("grant_type == GRANT_REFRESH_TOKEN: ", grant_type == GRANT_REFRESH_TOKEN)
-        kong.log("conf.enable_client_credentials and grant_type == GRANT_CLIENT_CREDENTIALS: ", conf.enable_client_credentials and grant_type == GRANT_CLIENT_CREDENTIALS)
-        kong.log("grant_type == GRANT_CLIENT_CREDENTIALS: ", grant_type == GRANT_CLIENT_CREDENTIALS)
-        kong.log("conf.enable_client_credentials: ", conf.enable_client_credentials)
-        kong.log("full thing: ", grant_type == GRANT_AUTHORIZATION_CODE or
+            
         grant_type == GRANT_REFRESH_TOKEN or
         (conf.enable_client_credentials and
                 grant_type == GRANT_CLIENT_CREDENTIALS) or
         (conf.enable_password_grant and grant_type == GRANT_PASSWORD))
-
+        
         response_params = error.execute_get_mapped_error("80013" .. language_from_header)
         -- response_params = {
         --     [ERROR] = "unsupported_grant_type",
@@ -1010,6 +1006,7 @@ function _M.execute(conf)
                 or string_find(path, "/v1/pin/grant", nil, true)
                 or string_find(path, "/v1/biometric/grant", nil, true)
         local prelogin = string_find(path, "/v1/prelogin/grant", nil, true)
+        local revoke = string_find(path, "/v1/access/revoke", nil, true)
 
         if prelogin then
             return issue_token(conf)
@@ -1017,8 +1014,8 @@ function _M.execute(conf)
 
         if from and grant_type == GRANT_REFRESH_TOKEN then
             return issue_token(conf)
-        elseif from then
-            local ok, err = do_authentication(conf, language_from_header)
+        elseif from or revoke then
+            local ok, err = do_authentication(conf,language_from_header)
             if not ok then
                 if conf.anonymous then
                     -- get anonymous user
@@ -1038,6 +1035,11 @@ function _M.execute(conf)
                     return kong.response.exit(err.status, err.message, err.headers)
                 end
             end
+
+            if revoke then
+                return delete_token(conf)
+            end
+            
             return issue_token(conf)
         end
 
@@ -1045,34 +1047,6 @@ function _M.execute(conf)
         if from then
             return authorize(conf, language_from_header)
         end
-    end
-
-    local ok, err = do_authentication(conf, language_from_header)
-    if not ok then
-        if conf.anonymous then
-            -- get anonymous user
-            local consumer_cache_key = kong.db.consumers:cache_key(conf.anonymous)
-            local consumer, err      = kong.cache:get(consumer_cache_key, nil,
-                kong.client.load_consumer,
-                conf.anonymous, true)
-            if err then
-                kong.log.err("failed to load anonymous consumer:", err)
-                -- return kong.response.exit(500, { message = "An unexpected error occurred" })
-                return internal_server_error(err)
-            end
-
-            set_consumer(consumer, nil, nil)
-
-        else
-            return kong.response.exit(err.status, err.message, err.headers)
-        end
-    end
-
-    -- if path matches that of revoke token endpoint, delete the row of data in db
-    local path = kong.request.get_path()
-    local revoke = string_find(path, "/v1/revoke-token", nil, true)
-    if revoke then
-        return delete_token(conf)
     end
 end
 
