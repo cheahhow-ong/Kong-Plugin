@@ -405,11 +405,6 @@ local function issue_token(conf)
                     grant_type == GRANT_CLIENT_CREDENTIALS) or
             (conf.enable_password_grant and grant_type == GRANT_PASSWORD)) then
             
-        grant_type == GRANT_REFRESH_TOKEN or
-        (conf.enable_client_credentials and
-                grant_type == GRANT_CLIENT_CREDENTIALS) or
-        (conf.enable_password_grant and grant_type == GRANT_PASSWORD))
-        
         response_params = error.execute_get_mapped_error("80013" .. language_from_header)
         -- response_params = {
         --     [ERROR] = "unsupported_grant_type",
@@ -1041,6 +1036,26 @@ function _M.execute(conf)
             end
             
             return issue_token(conf)
+        end
+
+        local ok, err = do_authentication(conf, language_from_header)
+        if not ok then
+            if conf.anonymous then
+                -- get anonymous user
+                local consumer_cache_key = kong.db.consumers:cache_key(conf.anonymous)
+                local consumer, err      = kong.cache:get(consumer_cache_key, nil,
+                    kong.client.load_consumer,
+                    conf.anonymous, true)
+                if err then
+                    kong.log.err("failed to load anonymous consumer:", err)
+                    return kong.response.exit(500, { message = "An unexpected error occurred" })
+                end
+
+                set_consumer(consumer, nil, nil)
+
+            else
+                return kong.response.exit(err.status, err.message, err.headers)
+            end
         end
 
         from = string_find(path, "/oauth2/authorize", nil, true)
