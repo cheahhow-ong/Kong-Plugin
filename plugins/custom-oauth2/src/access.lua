@@ -857,6 +857,9 @@ local function set_consumer(consumer, credential, token)
 end
 
 local function do_authentication(conf, language_from_header)
+    local path = kong.request.get_path()
+    local revoke = string_find(path, "/v1/access/revoke", nil, true)
+
     local access_token = parse_access_token(conf)
 
     if not access_token or access_token == "" then
@@ -875,6 +878,22 @@ local function do_authentication(conf, language_from_header)
     kong.log.inspect(access_token)
     
     local token = retrieve_token(conf, access_token)
+    if revoke and not token then
+        return nil, {
+            status = 401,
+            -- message = {
+            --     [ERROR] = "invalid_token",
+            --     error_description = "The access token has expired"
+            -- },
+            message = error.execute_get_mapped_error("80011" .. language_from_header),
+            headers = {
+                ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
+                        '"invalid_token" error_description=' ..
+                        '"The access token expired"'
+            }
+        }
+    end
+
     if not token then
         return nil, {
             status = 401,
@@ -926,7 +945,8 @@ local function do_authentication(conf, language_from_header)
     end
 
     -- Check expiration date of access token
-    if token.expires_in > 0 then -- zero means the token never expires
+    -- Skip the checking for /v1/access/revoke
+    if not revoke and token.expires_in > 0 then -- zero means the token never expires
         local now = timestamp.get_utc() / 1000
         if now - token.created_at > token.expires_in then
             return nil, {
