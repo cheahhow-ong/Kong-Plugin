@@ -48,6 +48,17 @@ local GRANT_PASSWORD = "password"
 local ERROR = "error"
 local AUTHENTICATED_USERID = "authenticated_userid"
 
+local function is_token_ttl_valid(ttl)
+    local current_time = os.time();
+
+    if ttl ~= nil and current_time >= ttl then
+        kong.log("TOKEN TTL RETURN: ", "true" )
+        return true
+    end
+    kong.log("TOKEN TTL RETURN: ", "false" )
+	return false
+end
+
 local function internal_server_error(err)
     local language_from_header = kong.request.get_header("Accept-Language")
     kong.log.err(err)
@@ -603,7 +614,9 @@ local function issue_token(conf)
             local token = refresh_token and
                     kong.db.oauth2_tokens:select_by_refresh_token(refresh_token)
 
-            if token ~= nil and token.is_valid == false then
+            if token and (token.is_valid == false or is_token_ttl_valid(token.ttl) == false) then
+                local token = refresh_token and
+                    kong.db.oauth2_tokens:delete_by_refresh_token(refresh_token)
                 kong.response.exit(
                     401,
                     error.execute_get_mapped_error("80016".. language_from_header),

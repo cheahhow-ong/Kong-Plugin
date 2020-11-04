@@ -127,6 +127,8 @@ local function delete_old_oauth2_token(body)
     -- sql query to delete by body.userrefid and body.scope
     local env = assert (luasql.postgres())
     local con = assert (env:connect('kong', 'kong', 'password', "postgresql-headless", 5432))
+    -- Use this to connect to local postgresql, change the (<dbname>, <user>, <password>) accordingly
+    -- local con = assert (env:connect('kong', 'kong', 'password'))
     local query = "UPDATE oauth2_tokens SET is_valid = false WHERE scope = '" .. scope .. "' AND authenticated_userid = '" .. authenticated_userid .. "';"
     local cur = assert (con:execute(query))
 
