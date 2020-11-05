@@ -242,7 +242,12 @@ function _M.transform_json_body(buffered_data, credential, headers)
   -- if not json_body["code"] and kong.service.response.get_status() == 200 then
   if kong.service.response.get_status() == 200 then
     if prelogin then
-      json_body["loginScope"] = "prelogin"
+      local headers = kong.ctx.plugin.headers
+      if headers.x_channel_id == "MB" then
+        json_body["loginScope"] = "prelogin.mobile"
+      elseif headers.x_channel_id == "WB" then
+        json_body["loginScope"] = "prelogin.web"
+      end
     elseif firsttime then
       json_body["loginScope"] = "firsttime"
     elseif pin then
