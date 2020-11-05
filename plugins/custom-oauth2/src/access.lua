@@ -75,16 +75,24 @@ scope, state, expiration, disable_refresh, token_id, token_jwt, token_ttl, devic
 
 --- Retrieve X-Channel-ID header to dictate access/refrehs token expiration
     local channel_id, err = kong.request.get_header("X-Channel-Id")
+    local language_from_header = kong.request.get_header("Accept-Language")
     if err or not channel_id then
         --- Serene/Cheah How, need to reserve another error code to throw here if X-Channel-ID isn't passed in
-        kong.response.exit(500)
+        -- kong.response.exit(200, { message = "x-channel-id missing" })
+        kong.response.exit(
+            401,
+            error.execute_get_mapped_error("80017" .. language_from_header),
+            {
+                ["WWW-Authenticate"] = 'Bearer realm="service"'
+            }
+        )
     end
 
     local refresh_token_ttl
     if (conf.mobile_refresh_token_ttl and conf.mobile_refresh_token_ttl > 0) and (conf.web_refresh_token_ttl and conf.web_refresh_token_ttl > 0) then
         if channel_id then
             if channel_id == "WB" then
-                disable_refresh = true
+                refresh_token_ttl = conf.web_refresh_token_ttl
             elseif channel_id == "MB" then
                 refresh_token_ttl = conf.mobile_refresh_token_ttl
             end
@@ -150,26 +158,48 @@ scope, state, expiration, disable_refresh, token_id, token_jwt, token_ttl, devic
     end
 
     if existing_refresh_token or refresh_token then
-        return {
-            access_token = token.access_token,
-            scope = token.scope,
-            issued_at = token.created_at,
-            token_type = "bearer",
-            expires_in = token_expiration > 0 and token.expires_in or nil,
-            refresh_token_expires_in = token_ttl or refresh_token_ttl,
-            refresh_token = refresh_token,
-            state = state -- If state is nil, this value won't be added
-        }
+        if channel_id == "WB" then
+            return {
+                access_token = token.access_token,
+                scope = token.scope,
+                issued_at = token.created_at,
+                token_type = "bearer",
+                expires_in = token_expiration > 0 and token.expires_in or nil,
+                state = state -- If state is nil, this value won't be added
+            }
+        elseif channel_id == "MB" then
+            return {
+                access_token = token.access_token,
+                scope = token.scope,
+                issued_at = token.created_at,
+                token_type = "bearer",
+                expires_in = token_expiration > 0 and token.expires_in or nil,
+                refresh_token_expires_in = token_ttl or refresh_token_ttl,
+                refresh_token = refresh_token,
+                state = state -- If state is nil, this value won't be added
+            }
+        end
     else
-        return {
-            access_token = token.access_token,
-            scope = token.scope,
-            issued_at = token.created_at,
-            token_type = "bearer",
-            expires_in = token_expiration > 0 and token.expires_in or nil,
-            refresh_token = refresh_token,
-            state = state -- If state is nil, this value won't be added
-        }
+        if channel_id == "WB" then
+            return {
+                access_token = token.access_token,
+                scope = token.scope,
+                issued_at = token.created_at,
+                token_type = "bearer",
+                expires_in = token_expiration > 0 and token.expires_in or nil,
+                state = state -- If state is nil, this value won't be added
+            }
+        elseif channel_id == "MB" then
+            return {
+                access_token = token.access_token,
+                scope = token.scope,
+                issued_at = token.created_at,
+                token_type = "bearer",
+                expires_in = token_expiration > 0 and token.expires_in or nil,
+                refresh_token = refresh_token,
+                state = state -- If state is nil, this value won't be added
+            }
+        end
     end
 end
 

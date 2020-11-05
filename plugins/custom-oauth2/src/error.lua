@@ -64,6 +64,13 @@ local function get_mapped_error(custom_error_code_and_language)
         ["description"] = "Access is denied because refresh token is invalid. User is kicked out of session.",
         ["message"] = "<Activity>attempts exceeded. Your account has been locked. Please contact<x>"
     }
+
+    error_msg_mappings["80017" .. eng] = {
+        ["code"] = "80017",
+        ["title"] = "X-Channel-Id header error",
+        ["description"] = "X-Channel-Id header is missing",
+        ["message"] = "Please try again."
+    }
        
     -- errors in thai
     error_msg_mappings["80004" .. thai] = {
@@ -120,6 +127,13 @@ local function get_mapped_error(custom_error_code_and_language)
         ["title"] = "ออกจากระบบ",
         ["description"] = "Access is denied because refresh token is invalid. User is kicked out of session.",
         ["message"] = "<Activity>attempts exceeded. Your account has been locked. Please contact<x>"
+    }
+
+    error_msg_mappings["80017" .. thai] = {
+        ["code"] = "80017",
+        ["title"] = "ทำรายการเกินเวลาที่กำหนด",
+        ["description"] = "X-Channel-Id header is missing",
+        ["message"] = "กรุณาลองใหม่อีกครั้ง"
     }
 
     return error_msg_mappings[custom_error_code_and_language]
