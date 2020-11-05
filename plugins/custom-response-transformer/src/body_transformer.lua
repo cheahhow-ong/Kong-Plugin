@@ -34,6 +34,8 @@ local unwanted_fields = {
   ["content-type"] = "content-type",
   ["connection"] = "connection",
   ["x-kong-upstream-latency"] = "x-kong-upstream-latency",
+  ["serviceUnavailable"] = "serviceUnavailable",
+  ["profile"] = "profile"
 }
 
 
@@ -98,6 +100,9 @@ local function build_jwt_payload(response_body, headers)
   if response_body ~= nil then
     for key, value in pairs(response_body) do
         payload[key] = value
+    end
+    for key, _ in pairs(unwanted_fields) do
+      payload[key] = nil
     end
   end
   return payload
