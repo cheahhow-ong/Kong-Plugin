@@ -126,14 +126,19 @@ end
 
 --- Stores x-device-id received from FE's request header in temporary table to be used in custom response transformer when upserting data (access token) into db
 local function retrieve_device_id()
-  local token_details = {}
-  -- FYI, Header names in are case-insensitive and are normalized to lowercase, and dashes (-) can be written as underscores (_); that is, the header X-Custom-Header can also be retrieved as x_custom_header.
-  local device_id_header, err, mimetype = kong.request.get_header("x-device-id")
-  if device_id_header == nil then
-    token_details = kong.ctx.shared.access_token_row or kong.db.oauth2_tokens:select_by_access_token(kong.ctx.shared.access_token_string)
+  local channel_id_header, err = kong.request.get_header("x-channel-id")
+  if channel_id_header == "WB" then
+    return
+  elseif channel_id_header == "MB" then
+    local token_details = {}
+    -- FYI, Header names in are case-insensitive and are normalized to lowercase, and dashes (-) can be written as underscores (_); that is, the header X-Custom-Header can also be retrieved as x_custom_header.
+    local device_id_header, err, mimetype = kong.request.get_header("x-device-id")
+    if device_id_header == nil then
+      token_details = kong.ctx.shared.access_token_row or kong.db.oauth2_tokens:select_by_access_token(kong.ctx.shared.access_token_string)
+    end
+    -- This is also used in custom-reponse-transformer to upsert the oauth2_token's device_id column.
+    kong.ctx.shared.device_id = token_details.device_id or device_id_header
   end
-  -- This is also used in custom-reponse-transformer to upsert the oauth2_token's device_id column.
-  kong.ctx.shared.device_id = token_details.device_id or device_id_header
 end
 
 --- Execute the script
