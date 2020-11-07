@@ -57,31 +57,11 @@ end
 -- @return the payload to be used in encode_jwt_token
 local function build_jwt_payload()
   local current_time = ngx.time() -- Much better performance improvement over os.time()
-  local payload = {
-    exp = current_time + 900,
-    jti = utils.uuid(),
-    iat = current_time
-  }
-
-  -- adds all field from request body into JWT payload
-  local body, err, mimetype = kong.request.get_body()
-  if body ~= nil then
-    for key, value in pairs(body) do
-      payload[key] = value
-    end
-  end
-
-  -- adds all headers of request into JWT payload
-  local headers, err, mimetype = kong.request.get_headers()
-  if headers ~= nil then
-    for key, value in pairs(headers) do
-      payload[key] = value
-    end
-  end
+  local payload = {}
 
   -- adds all required field (specified by BE) for JWT payload
   payload["deviceId"] = kong.ctx.shared.device_id or "SYSTEM"
-  payload["loginScope"] = "prelogin" -- hardcoded to prelogin because this function will only be used in prelogin flow, other flows will use the add_existing_jwt_header_hs256 function
+  payload["loginScope"] = kong.ctx.shared.login_scope -- hardcoded to prelogin because this function will only be used in prelogin flow, other flows will use the add_existing_jwt_header_hs256 function
   payload["userRefId"] = "SYSTEM"
   payload["userId"] = "SYSTEM"
   payload["corporateRefId"] = "SYSTEM"
@@ -128,6 +108,7 @@ end
 local function retrieve_device_id()
   local channel_id_header, err = kong.request.get_header("x-channel-id")
   if channel_id_header == "WB" then
+    kong.ctx.shared.login_scope = "prelogin.web"
     return
   elseif channel_id_header == "MB" then
     local token_details = {}
@@ -138,6 +119,7 @@ local function retrieve_device_id()
     end
     -- This is also used in custom-reponse-transformer to upsert the oauth2_token's device_id column.
     kong.ctx.shared.device_id = token_details.device_id or device_id_header
+    kong.ctx.shared.login_scope = "prelogin.mobile"
   end
 end
 

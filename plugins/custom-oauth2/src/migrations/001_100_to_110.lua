@@ -3,7 +3,7 @@ return {
     up = [[
       DO $$
       BEGIN
-        ALTER TABLE IF EXISTS ONLY "oauth2_tokens" ADD "jwt" TEXT UNIQUE;
+        ALTER TABLE IF EXISTS ONLY "oauth2_tokens" ADD "jwt" TEXT;
       EXCEPTION WHEN DUPLICATE_COLUMN THEN
         -- Do nothing, accept existing state
       END$$;

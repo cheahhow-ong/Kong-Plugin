@@ -35,7 +35,8 @@ local unwanted_fields = {
   ["connection"] = "connection",
   ["x-kong-upstream-latency"] = "x-kong-upstream-latency",
   ["serviceUnavailable"] = "serviceUnavailable",
-  ["profile"] = "profile"
+  ["profile"] = "profile",
+  ["config"] = "config"
 }
 
 
@@ -73,36 +74,42 @@ local function encode_jwt_token_hs256(payload, key)
   return table_concat(segments, ".")
 end
 
---- Build the JWT token payload based off the `payload_hash`
--- @param conf the configuration
--- @param payload_hash the payload hash
--- @return the JWT payload (table)
-local function build_jwt_payload(response_body, headers)
-  local current_time = ngx.time() -- Much better performance improvement over os.time()
+--- builds JWT payload based on required field specified by BE for as documented in confluence:
+--https://ktbinnovation.atlassian.net/wiki/spaces/BN/pages/861569512/Common+Handling+BE+-+Standard+HTTP+Header+Fields+v2020.XX#JWT-Token-Fields-for-MS-to-MS-generated-by-Kong
+local function build_jwt_payload(response_body)
   local payload = {
-    exp = current_time + 900,
-    jti = utils.uuid(),
-    iat = current_time,
-    -- channelId = "NB", -- TODO: Explain what is "NB"
-    -- language = headers["Accept-Language"],
-    -- clientVersion = headers["X-Client-Version"],
-    -- deviceId = headers["X-Device-ID"]
-
     -- default to SYSTEM for the following fields, if BE does return such fields, replace value in the next block of code
     userRefId = "SYSTEM",
     userId = "SYSTEM",
     corporateRefId = "SYSTEM",
-    corporateId = "SYSTEM",
+    companyId = "SYSTEM",
     mobileNo = "SYSTEM",
     deviceId = kong.ctx.shared.device_id or "SYSTEM"
   }
 
   if response_body ~= nil then
     for key, value in pairs(response_body) do
-        payload[key] = value
-    end
-    for key, _ in pairs(unwanted_fields) do
-      payload[key] = nil
+      if key == "userRefId" then
+        payload["userRefId"] = value
+      end
+      if key == "userId" then
+        payload["userId"] = value
+      end
+      if key == "corporateRefId" then
+        payload["corporateRefId"] = value
+      end
+      if key == "companyId" then
+        payload["companyId"] = value
+      end
+      if key == "mobileNo" then
+        payload["mobileNo"] = value
+      end
+      if key == "loginScope" then
+        payload["loginScope"] = value
+      end
+      if key == "deviceId" then
+        payload["deviceId"] = value
+      end
     end
   end
   return payload
@@ -111,8 +118,8 @@ end
 --- Add the JWT header to the request
 -- @param conf the configuration
 -- Grab the value of secret from the shared kong.ctx.plugin.credential table
-local function add_jwt_body_hs256(response_body, key, headers)
-  local payload = build_jwt_payload(response_body, headers)
+local function add_jwt_body_hs256(response_body, key)
+  local payload = build_jwt_payload(response_body)
   return encode_jwt_token_hs256(payload, key)
 end
 
@@ -123,17 +130,18 @@ local function read_json_body(body)
 end
 
 local function delete_old_oauth2_token(body)
-  kong.log.inspect("userRefId: ", body.userRefId)
-  kong.log.inspect("scope: ", body.loginScope)
 
   ngx.timer.at(0, function(premature)
     local scope = body.loginScope
     local authenticated_userid = body.userRefId
-    -- sql query to delete by body.userrefid and body.scope
     local env = assert (luasql.postgres())
-    local con = assert (env:connect('kong', 'kong', 'password', "postgresql-headless", 5432))
+    --- sql query to delete by body.userrefid and body.scope
     -- Use this to connect to local postgresql, change the (<dbname>, <user>, <password>) accordingly
-    -- local con = assert (env:connect('kong', 'kong', 'password'))
+
+    --  local con = assert (env:connect('kong', 'kong', 'kong'))
+     local con = assert (env:connect('kong', 'kong', 'password', "postgresql-headless", 5432))
+
+--     local con = assert (env:connect('mk', 'mk', 'mk'))
     local query = "UPDATE oauth2_tokens SET is_valid = false WHERE scope = '" .. scope .. "' AND authenticated_userid = '" .. authenticated_userid .. "';"
     local cur = assert (con:execute(query))
 
@@ -258,7 +266,7 @@ function _M.transform_json_body(buffered_data, credential, headers)
       json_body["loginScope"] = "password"
     end
 
-    json_body["jwt"] = add_jwt_body_hs256(json_body, credential.secret, headers)
+    json_body["jwt"] = add_jwt_body_hs256(json_body, credential.secret)
 
     frontend_response["scope"] = json_body["loginScope"]
   end

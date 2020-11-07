@@ -77,7 +77,7 @@ local oauth2_tokens = {
     { authenticated_userid = { type = "string", required = false }, },
     { scope = { type = "string" }, },
     { is_valid = { type = "boolean", default = true }, },
-    { jwt = { type = "string", unique = true }, },
+    { jwt = { type = "string" }, },
     { device_id = { type = "string" }, },
   },
 }

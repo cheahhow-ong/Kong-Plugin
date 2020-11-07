@@ -52,10 +52,8 @@ local function is_token_ttl_valid(ttl)
     local current_time = os.time();
 
     if ttl ~= nil and current_time >= ttl then
-        kong.log("TOKEN TTL RETURN: ", "true" )
         return true
     end
-    kong.log("TOKEN TTL RETURN: ", "false" )
 	return false
 end
 
@@ -78,14 +76,15 @@ scope, state, expiration, disable_refresh, token_id, token_jwt, token_ttl, devic
     local language_from_header = kong.request.get_header("Accept-Language")
     if err or not channel_id then
         --- Serene/Cheah How, need to reserve another error code to throw here if X-Channel-ID isn't passed in
-        -- kong.response.exit(200, { message = "x-channel-id missing" })
-        kong.response.exit(
-            401,
-            error.execute_get_mapped_error("80017" .. language_from_header),
-            {
-                ["WWW-Authenticate"] = 'Bearer realm="service"'
-            }
-        )
+         kong.response.exit(400, { message = "x-channel-id missing" })
+--    TODO: change all the mandatory headers to throw a common error
+--         kong.response.exit(
+--             401,
+--             error.execute_get_mapped_error("80017" .. language_from_header),
+--             {
+--                 ["WWW-Authenticate"] = 'Bearer realm="service"'
+--             }
+--         )
     end
 
     local refresh_token_ttl
@@ -157,50 +156,65 @@ scope, state, expiration, disable_refresh, token_id, token_jwt, token_ttl, devic
         return internal_server_error(err)
     end
 
-    if existing_refresh_token or refresh_token then
-        if channel_id == "WB" then
-            return {
-                access_token = token.access_token,
-                scope = token.scope,
-                issued_at = token.created_at,
-                token_type = "bearer",
-                expires_in = token_expiration > 0 and token.expires_in or nil,
-                state = state -- If state is nil, this value won't be added
-            }
-        elseif channel_id == "MB" then
-            return {
-                access_token = token.access_token,
-                scope = token.scope,
-                issued_at = token.created_at,
-                token_type = "bearer",
-                expires_in = token_expiration > 0 and token.expires_in or nil,
-                refresh_token_expires_in = token_ttl or refresh_token_ttl,
-                refresh_token = refresh_token,
-                state = state -- If state is nil, this value won't be added
-            }
-        end
+    if existing_refresh_token or refresh_token and channel_id == "MB" then
+        return {
+            access_token = token.access_token,
+            scope = token.scope,
+            token_type = "bearer",
+            expires_in = token_expiration > 0 and token.expires_in or nil,
+            refresh_token_expires_in = token_ttl or refresh_token_ttl,
+            refresh_token = refresh_token,
+            state = state -- If state is nil, this value won't be added
+        }
     else
-        if channel_id == "WB" then
-            return {
-                access_token = token.access_token,
-                scope = token.scope,
-                issued_at = token.created_at,
-                token_type = "bearer",
-                expires_in = token_expiration > 0 and token.expires_in or nil,
-                state = state -- If state is nil, this value won't be added
-            }
-        elseif channel_id == "MB" then
-            return {
-                access_token = token.access_token,
-                scope = token.scope,
-                issued_at = token.created_at,
-                token_type = "bearer",
-                expires_in = token_expiration > 0 and token.expires_in or nil,
-                refresh_token = refresh_token,
-                state = state -- If state is nil, this value won't be added
-            }
-        end
+        return {
+            access_token = token.access_token,
+            scope = token.scope,
+            token_type = "bearer",
+            expires_in = token_expiration > 0 and token.expires_in or nil,
+            state = state -- If state is nil, this value won't be added
+        }
     end
+--
+--        if channel_id == "WB" then
+--            return {
+--                access_token = token.access_token,
+--                scope = token.scope,
+--                token_type = "bearer",
+--                expires_in = token_expiration > 0 and token.expires_in or nil,
+--                state = state -- If state is nil, this value won't be added
+--            }
+--        elseif channel_id == "MB" then
+--            return {
+--                access_token = token.access_token,
+--                scope = token.scope,
+--                token_type = "bearer",
+--                expires_in = token_expiration > 0 and token.expires_in or nil,
+--                refresh_token_expires_in = token_ttl or refresh_token_ttl,
+--                refresh_token = refresh_token,
+--                state = state -- If state is nil, this value won't be added
+--            }
+--        end
+--    else
+--        if channel_id == "WB" then
+--            return {
+--                access_token = token.access_token,
+--                scope = token.scope,
+--                token_type = "bearer",
+--                expires_in = token_expiration > 0 and token.expires_in or nil,
+--                state = state -- If state is nil, this value won't be added
+--            }
+--        elseif channel_id == "MB" then
+--            return {
+--                access_token = token.access_token,
+--                scope = token.scope,
+--                token_type = "bearer",
+--                expires_in = token_expiration > 0 and token.expires_in or nil,
+--                refresh_token = refresh_token,
+--                state = state -- If state is nil, this value won't be added
+--            }
+--        end
+--    end
 end
 
 local function load_oauth2_credential_by_client_id(client_id)
@@ -318,7 +332,6 @@ local function authorize(conf, language_from_header)
         allowed_redirect_uris, client = get_redirect_uris(parameters[CLIENT_ID])
 
         if not allowed_redirect_uris then
-            kong.log("HIHI SUPER SUPER SUPER SUPER ERROR HERE")
             response_params = error.execute_get_generic_error(language_from_header, "error = invalid_client. error_description = Invalid client authentication")
             -- response_params = {
             --     [ERROR] = "invalid_client",
@@ -481,16 +494,11 @@ local function issue_token(conf)
             (conf.enable_password_grant and grant_type == GRANT_PASSWORD)) then
             
         response_params = error.execute_get_mapped_error("80013" .. language_from_header)
-        -- response_params = {
-        --     [ERROR] = "unsupported_grant_type",
-        --     error_description = "Invalid " .. GRANT_TYPE .. ", grant_type: " .. grant_type
-        -- }
         
     end
 
     local client_id, client_secret, from_authorization_header =
     retrieve_client_credentials(parameters, conf)
-    -- kong.log("ERROR: ", client_id, client_secret,from_authorization_header )
     -- Check client_id and redirect_uri
     local allowed_redirect_uris, client = get_redirect_uris(client_id)
     if not (grant_type == GRANT_CLIENT_CREDENTIALS) then
@@ -501,21 +509,12 @@ local function issue_token(conf)
 
             if not table_contains(allowed_redirect_uris, redirect_uri) then
                 response_params = error.execute_get_generic_error(language_from_header, "error = invalid_request. error_description = Invalid " .. REDIRECT_URI .. " that does " .. "not match with any redirect_uri created " .. "with the application")
-                -- response_params = {
-                --     [ERROR] = "invalid_request",
-                --     error_description = "Invalid " .. REDIRECT_URI .. " that does " ..
-                --             "not match with any redirect_uri created "  ..
-                --             "with the application"
-                -- }
+
             end
 
         else
-            kong.log("invalid_client here")
             response_params = error.execute_get_generic_error(language_from_header, "error = invalid_client. error_description = Invalid client authentication")
-            -- response_params = {
-            --     [ERROR] = "invalid_client",
-            --     error_description = "Invalid client authentication"
-            -- }
+
 
             if from_authorization_header then
                 invalid_client_properties = {
@@ -527,17 +526,8 @@ local function issue_token(conf)
     end
 
     if client and client.client_secret ~= client_secret then
-        kong.log("client: ", client)
-        kong.log("client.client_secret: ", client.client_secret)
-        kong.log("client_secret: ", client_secret)
-        kong.log("invalid_client here")
-        kong.log("client and client.client_secret ~= client_secret: ", client and client.client_secret ~= client_secret)
-        kong.log("client.client_secret ~= client_secret: ", client.client_secret ~= client_secret)
         response_params = error.execute_get_generic_error(language_from_header, "error = invalid_client. error_description = Invalid client authentication")
-        -- response_params = {
-        --     [ERROR] = "invalid_client",
-        --     error_description = "Invalid client authentication"
-        -- }
+
 
         if from_authorization_header then
             invalid_client_properties = {
@@ -548,9 +538,7 @@ local function issue_token(conf)
     end
 
     if not response_params[ERROR] and not response_params["description"] then
-        kong.log("here1")
         if grant_type == GRANT_AUTHORIZATION_CODE then
-            kong.log("here2")
             local code = parameters[CODE]
 
             local service_id
@@ -564,17 +552,9 @@ local function issue_token(conf)
             if not auth_code or (service_id and service_id ~= auth_code.service.id)
             then
                 response_params = error.execute_get_generic_error(language_from_header, "error = invalid_request. error_description = Invalid " .. CODE)
-                -- response_params = {
-                --     [ERROR] = "invalid_request",
-                --     error_description = "Invalid " .. CODE
-                -- }
 
             elseif auth_code.credential.id ~= client.id then
                 response_params = error.execute_get_generic_error(language_from_header, "error = invalid_request. error_description = Invalid " .. CODE)
-                -- response_params = {
-                --     [ERROR] = "invalid_request",
-                --     error_description = "Invalid " .. CODE
-                -- }
 
             else
                 response_params = generate_token(conf, kong.router.get_service(),
@@ -587,23 +567,13 @@ local function issue_token(conf)
             end
 
         elseif grant_type == GRANT_CLIENT_CREDENTIALS then
-            kong.log("here3")
             -- Only check the provision_key if the authenticated_userid is being set
             if parameters.authenticated_userid and
                     conf.provision_key ~= parameters.provision_key then
                 response_params = error.execute_get_generic_error(language_from_header, "error = invalid_provision_key. error_description = Invalid provision_key")
-                -- response_params = {
-                --     [ERROR] = "invalid_provision_key",
-                --     error_description = "Invalid provision_key"
-                -- }
 
             elseif not client then
-                kong.log("invalid_client here")
                 response_params = error.execute_get_generic_error(language_from_header, "error = invalid_client. error_description = Invalid client authentication")
-                -- response_params = {
-                --     [ERROR] = "invalid_client",
-                --     error_description = "Invalid client authentication"
-                -- }
 
             else
                 -- Check scopes
@@ -617,12 +587,10 @@ local function issue_token(conf)
                         client,
                         parameters.authenticated_userid,
                         scope, state, nil, false)
-                    kong.log("response_params", kong.log.inspect(response_params))
                 end
             end
 
         elseif grant_type == GRANT_PASSWORD then
-            kong.log("here4")
             -- Check that it comes from the right client
             if conf.provision_key ~= parameters.provision_key then
                 response_params = error.execute_get_generic_error(language_from_header, "error = invalid_provision_key. error_description = Invalid provision_key")
@@ -655,7 +623,6 @@ local function issue_token(conf)
             end
 
         elseif grant_type == GRANT_REFRESH_TOKEN then
-            kong.log("here5")
             local refresh_token = parameters[REFRESH_TOKEN]
 
             local service_id
@@ -669,50 +636,22 @@ local function issue_token(conf)
             if token and (token.is_valid == false or is_token_ttl_valid(token.ttl) == false) then
                 local token = refresh_token and
                     kong.db.oauth2_tokens:delete_by_refresh_token(refresh_token)
-                kong.response.exit(
-                    401,
-                    error.execute_get_mapped_error("80016".. language_from_header),
-                    {
-                        ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
-                                '"invalid_token" error_description=' ..
-                                '"The refresh token is invalid"'
-                    }
-                )
+                kong.response.exit(401, error.execute_get_mapped_error("80016".. language_from_header))
             end
             -- if not token or (service_id and service_id ~= token.service.id) then
             if not token then
-                kong.response.exit(
-                    401,
-                    error.execute_get_mapped_error("80012" .. language_from_header),
-                    {
-                        ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
-                                '"invalid_token" error_description=' ..
-                                '"The refresh token is invalid"'
-                    }
-                )
-                -- response_params = error.execute_get_mapped_error("80012" .. language_from_header)
-                -- response_params = error.execute_get_generic_error(language_from_header, "error = invalid_request. error_description = Invalid " .. REFRESH_TOKEN)
-                -- response_params = {
-                --     [ERROR] = "invalid_request",
-                --     error_description = "Invalid " .. REFRESH_TOKEN
-                -- }
+                kong.response.exit(401, error.execute_get_mapped_error("80012" .. language_from_header))
 
             else
                 -- Check that the token belongs to the client application
                 if token.credential.id ~= client.id then
-                    kong.log("HIHI ZOO ERROR HERE")
                     response_params = error.execute_get_generic_error(language_from_header, "error = invalid_client. error_description = Invalid client authentication")
-                    -- response_params = {
-                    --     [ERROR] = "invalid_client",
-                    --     error_description = "Invalid client authentication"
-                    -- }
 
                 else
                     response_params = generate_token(conf, kong.router.get_service(),
                         client,
                         token.authenticated_userid,
                         token.scope, state, nil, false, token.id, token.jwt, token.ttl, token.device_id)
-                    kong.log("refreshed token successful")
                 end
             end
             -- ensures other plugins in access phase is not executed
@@ -729,34 +668,17 @@ local function issue_token(conf)
                     )
         end
     end
-    kong.log("here6")
     if response_params.access_token then
-        kong.log("here7")
         -- response_params contains most of the values required to be shown to the frontend
         -- used in response-transformer-custom to generate a consolidated frontend response
         kong.ctx.shared.frontend_response = response_params
 
         -- Storing reponse_params inside kong.ctx.shared.token and returning it to FE
         kong.ctx.shared.token = kong.db.oauth2_tokens:select_by_access_token(response_params.access_token)
-        kong.log("Access token is SUCCESSFULLY generated")
-        kong.log("kong.ctx.shared.token: ")
+        kong.log("Access token is succefully generated")
         kong.log.inspect(kong.ctx.shared.token)
     else
-        kong.log("here8")
         kong.log("Access token is not successfully generated")
-        -- return kong.response.exit(response_params[ERROR] and
-        -- -- test
-        -- return kong.response.exit(response_params and
-        --         (invalid_client_properties and
-        --                 invalid_client_properties.status or 400),
-        --     response_params, {
-        --         ["cache-control"] = "no-store",
-        --         ["pragma"] = "no-cache",
-        --         ["www-authenticate"] = invalid_client_properties and
-        --                 invalid_client_properties.www_authenticate
-        --     }
-        -- )
-        -- return kong.response.exit((response_params[ERROR] or 500)  or 200,
         return kong.response.exit(500,
             response_params, {
                 ["cache-control"] = "no-store",
@@ -782,11 +704,7 @@ local function load_token(conf, service, access_token)
     if not conf.global_credentials then
         if not credentials.service then
             return kong.response.exit(500, error.execute_get_generic_error(language_from_header, "error = invalid_token. error_description = The access token is global, but the current " .. "plugin is configured without 'global_credentials'"))
-            -- return kong.response.exit(401, {
-            --     [ERROR] = "invalid_token",
-            --     error_description = "The access token is global, but the current " ..
-            --             "plugin is configured without 'global_credentials'",
-            -- })
+
         end
 
         if credentials.service.id ~= service.id then
@@ -930,10 +848,6 @@ local function do_authentication(conf, language_from_header)
     if not access_token or access_token == "" then
         return nil, {
             status = 401,
-            -- message = {
-            --     [ERROR] = "invalid_request",
-            --     error_description = "The access token is missing"
-            -- },
             message = error.execute_get_mapped_error("80004" .. language_from_header),
             headers = {
                 ["WWW-Authenticate"] = 'Bearer realm="service"'
@@ -946,10 +860,6 @@ local function do_authentication(conf, language_from_header)
     if revoke and not token then
         return nil, {
             status = 401,
-            -- message = {
-            --     [ERROR] = "invalid_token",
-            --     error_description = "The access token has expired"
-            -- },
             message = error.execute_get_mapped_error("80011" .. language_from_header),
             headers = {
                 ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
@@ -962,10 +872,6 @@ local function do_authentication(conf, language_from_header)
     if not token then
         return nil, {
             status = 401,
-            -- message = {
-            --     [ERROR] = "invalid_token",
-            --     error_description = "The access token has expired"
-            -- },
             message = error.execute_get_mapped_error("80011" .. language_from_header),
             headers = {
                 ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
@@ -977,10 +883,6 @@ local function do_authentication(conf, language_from_header)
     if token.is_valid == false then
         return nil, {
             status = 401,
-            -- message = {
-            --     [ERROR] = "invalid_token",
-            --     error_description = "The access token is invalid"
-            -- },
             message = error.execute_get_mapped_error("80015".. language_from_header),
             headers = {
                 ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
@@ -996,10 +898,6 @@ local function do_authentication(conf, language_from_header)
                     not conf.global_credentials) then
         return nil, {
             status = 401,
-            -- message = {
-            --     [ERROR] = "invalid_token",
-            --     error_description = "The access token is invalid or has expired"
-            -- },
             message = error.execute_get_mapped_error("80011" .. language_from_header),
             headers = {
                 ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
@@ -1015,11 +913,6 @@ local function do_authentication(conf, language_from_header)
         local now = timestamp.get_utc() / 1000
         if now - token.created_at > token.expires_in then
             return nil, {
-                status = 401,
-                -- message = {
-                --     [ERROR] = "invalid_token",
-                --     error_description = "The access token is invalid or has expired"
-                -- },
                 message = error.execute_get_mapped_error("80011" .. language_from_header),
                 headers = {
                     ["WWW-Authenticate"] = 'Bearer realm="service" error=' ..
@@ -1060,20 +953,6 @@ end
 local function delete_token(conf)
     local access_token_from_fe = parse_access_token(conf)
     local msg
-    
-    -- if not access_token_from_fe or access_token_from_fe == "" then
-    --     return nil, {
-    --         status = 401,
-    --         -- message = {
-    --         --     [ERROR] = "invalid_request",
-    --         --     error_description = "The access token is missing"
-    --         -- },
-    --         message = error.execute_get_mapped_error("80004" .. language_from_header),
-    --         headers = {
-    --             ["WWW-Authenticate"] = 'Bearer realm="service"'
-    --         }
-    --     }
-    -- end
 
     if access_token_from_fe ~= nil then
 
@@ -1082,8 +961,6 @@ local function delete_token(conf)
         local invalidate_var, invalidate_err = kong.cache:invalidate(token_cache_key)
         if invalidate_err ~= nil then
             return internal_server_error(invalidate_err)
-        -- else
-        --     msg = "Access token '".. access_token_from_fe .. "' has successfully been deleted from cache"
         end
 
         -- delete token in db
@@ -1093,22 +970,11 @@ local function delete_token(conf)
 
             if delete_err then
                 return internal_server_error(delete_err)
-            -- else
-            --     msg = msg .. " and database."
             end
-        -- else
-        --     msg = msg .. " and is unavailable in database."
         end
         return kong.response.exit(200, { message = "Access token has been successfully deleted" })
-    -- else
-    --     return kong.response.exit(200, { message = "No access token received from frontend." })
     end
 
-    -- if err then
-    --     return internal_server_error(err)
-    -- else
-    --     return kong.response.exit(200, { message = "Access token '" .. access_token_from_fe .. "' has successfully been deleted." })
-    -- end
 end
 
 
@@ -1191,6 +1057,27 @@ function _M.execute(conf)
         from = string_find(path, "/oauth2/authorize", nil, true)
         if from then
             return authorize(conf, language_from_header)
+        end
+    end
+
+    --- If request ~= POST, kong will do authentication
+    local ok, err = do_authentication(conf, language_from_header)
+    if not ok then
+        if conf.anonymous then
+            -- get anonymous user
+            local consumer_cache_key = kong.db.consumers:cache_key(conf.anonymous)
+            local consumer, err      = kong.cache:get(consumer_cache_key, nil,
+                kong.client.load_consumer,
+                conf.anonymous, true)
+            if err then
+                kong.log.err("failed to load anonymous consumer:", err)
+                return kong.response.exit(500, { message = "An unexpected error occurred" })
+            end
+
+            set_consumer(consumer, nil, nil)
+
+        else
+            return kong.response.exit(err.status, err.message, err.headers)
         end
     end
 end
